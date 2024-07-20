@@ -4,6 +4,9 @@ authors = ["bstriker <strikeforcezero@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = ["crates/*"]
+
 [dependencies]
 avian2d = "0.1"
 bevy = { version = "0.14", features = ["wayland"] }
