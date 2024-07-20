@@ -590,6 +590,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_game_jam_5_prototypes"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "log",
+ "rand",
+]
+
+[[package]]
 name = "bevy_gilrs"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -824,15 +833,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c115c97a5c8a263bd0aa7001b999772c744ac5ba797d07c86f25734ce381ea69"
 
 [[package]]
-name = "bevy_quickstart"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "log",
- "rand",
-]
-
-[[package]]
 name = "bevy_reflect"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1008,15 +1008,6 @@ dependencies = [
  "concurrent-queue",
  "futures-lite",
  "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "bevy_game_jam_5_prototypes"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "log",
- "rand",
 ]
 
 [[package]]
