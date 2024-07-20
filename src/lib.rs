@@ -1,8 +1,10 @@
 use bevy::{
     asset::AssetMetaCheck,
     audio::{AudioPlugin, Volume},
+    log::LogPlugin,
     prelude::*,
 };
+use bevy_frame_count_log_prefix::prelude::FrameCountLogPrefixPlugin;
 
 #[cfg(feature = "dev")]
 mod dev_tools;
@@ -26,6 +28,8 @@ impl Plugin for AppPlugin {
         // Add Bevy plugins.
         app.add_plugins(
             DefaultPlugins
+                .build()
+                .disable::<LogPlugin>()
                 .set(AssetPlugin {
                     // Wasm builds will check for meta files (that don't exist) if this isn't set.
                     // This causes errors and even panics on web build on itch.
@@ -51,6 +55,12 @@ impl Plugin for AppPlugin {
                     ..default()
                 }),
         );
+
+        // Third party plugins
+        app.add_plugins((
+            // multiline
+            FrameCountLogPrefixPlugin,
+        ));
 
         // Add other plugins.
         app.add_plugins((game::plugin, screen::plugin, ui::plugin));
