@@ -1,3 +1,5 @@
+use avian2d::PhysicsPlugins;
+use avian2d::prelude::Gravity;
 use bevy::{
     asset::AssetMetaCheck,
     audio::{AudioPlugin, Volume},
@@ -60,7 +62,11 @@ impl Plugin for AppPlugin {
         app.add_plugins((
             // multiline
             FrameCountLogPrefixPlugin,
+            PhysicsPlugins::default(),
         ));
+
+        // Disable standard gravity
+        app.insert_resource(Gravity(Vec2::ZERO));
 
         // Add other plugins.
         app.add_plugins((game::plugin, screen::plugin, ui::plugin));
