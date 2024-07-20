@@ -3,11 +3,12 @@
 
 use bevy::prelude::*;
 
-use super::Screen;
 use crate::{
     game::assets::{HandleMap, ImageKey, SfxKey, SoundtrackKey},
     ui::prelude::*,
 };
+
+use super::Screen;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(OnEnter(Screen::Loading), enter_loading);

@@ -1,14 +1,14 @@
-#[cfg(feature = "dev")]
-mod dev_tools;
-mod game;
-mod screen;
-mod ui;
-
 use bevy::{
     asset::AssetMetaCheck,
     audio::{AudioPlugin, Volume},
     prelude::*,
 };
+
+#[cfg(feature = "dev")]
+mod dev_tools;
+mod game;
+mod screen;
+mod ui;
 
 pub struct AppPlugin;
 

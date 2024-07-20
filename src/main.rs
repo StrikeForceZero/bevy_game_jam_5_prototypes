@@ -2,6 +2,7 @@
 #![cfg_attr(not(feature = "dev"), windows_subsystem = "windows")]
 
 use bevy::prelude::*;
+
 use bevy_game_jam_5_prototypes::AppPlugin;
 
 fn main() -> AppExit {
