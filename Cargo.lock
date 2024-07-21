@@ -722,6 +722,7 @@ dependencies = [
  "bevy",
  "bevy-inspector-egui",
  "bevy_frame_count_log_prefix",
+ "derive_more",
  "internal_proc_macros",
  "internal_shared",
  "log",
