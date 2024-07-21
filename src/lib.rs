@@ -69,7 +69,12 @@ impl Plugin for AppPlugin {
         app.insert_resource(Gravity(Vec2::ZERO));
 
         // Add other plugins.
-        app.add_plugins((game::plugin, screen::plugin, ui::plugin));
+        app.add_plugins((
+            // multiline
+            game::plugin,
+            screen::plugin,
+            ui::plugin,
+        ));
 
         // Enable dev tools for dev builds.
         #[cfg(feature = "dev")]
