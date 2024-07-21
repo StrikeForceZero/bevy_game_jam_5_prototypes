@@ -637,6 +637,8 @@ dependencies = [
  "avian2d",
  "bevy",
  "bevy_frame_count_log_prefix",
+ "internal_proc_macros",
+ "internal_shared",
  "log",
  "rand",
 ]
@@ -2296,6 +2298,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e05c02b5e89bff3b946cedeca278abc628fe811e604f027c45a8aa3cf793d0eb"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "internal_proc_macros"
+version = "0.0.0"
+dependencies = [
+ "internal_shared",
+ "lazy_static",
+ "paste",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.71",
+]
+
+[[package]]
+name = "internal_shared"
+version = "0.0.0"
+dependencies = [
+ "bevy_app",
 ]
 
 [[package]]

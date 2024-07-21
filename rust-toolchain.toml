@@ -1,0 +1,3 @@
+[toolchain]
+# required for #![feature(proc_macro_span)] in internal_proc_macros
+channel = "nightly"
