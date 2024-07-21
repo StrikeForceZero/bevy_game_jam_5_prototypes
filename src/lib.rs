@@ -13,6 +13,7 @@ mod dev_tools;
 mod game;
 mod screen;
 mod ui;
+mod util;
 
 pub struct AppPlugin;
 
@@ -71,6 +72,7 @@ impl Plugin for AppPlugin {
         // Add other plugins.
         app.add_plugins((
             // multiline
+            util::plugin,
             game::plugin,
             screen::plugin,
             ui::plugin,
