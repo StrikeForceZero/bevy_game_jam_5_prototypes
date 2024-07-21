@@ -16,6 +16,7 @@ bevy = { version = "0.14", features = ["wayland"] }
 bevy_frame_count_log_prefix = { git = "https://github.com/StrikeForceZero/bevy_frame_count_log_prefix" }
 bevy-inspector-egui = "0.25.1"
 derive_more = "0.99.18"
+itertools = "0.13.0"
 # Disable low-severity logs at compile time for performance.
 log = { version = "0.4", features = [
     "max_level_debug",

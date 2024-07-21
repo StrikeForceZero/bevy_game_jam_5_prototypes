@@ -725,6 +725,7 @@ dependencies = [
  "derive_more",
  "internal_proc_macros",
  "internal_shared",
+ "itertools 0.13.0",
  "log",
  "ordered-float",
  "rand",
