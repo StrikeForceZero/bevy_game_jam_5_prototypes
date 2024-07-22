@@ -7,6 +7,7 @@ use bevy::{
     prelude::*,
 };
 use bevy_frame_count_log_prefix::prelude::FrameCountLogPrefixPlugin;
+use bevy_inspector_egui::bevy_egui::EguiPlugin;
 
 use crate::game::camera::MainCamera;
 
@@ -65,6 +66,7 @@ impl Plugin for AppPlugin {
         app.add_plugins((
             // multiline
             FrameCountLogPrefixPlugin,
+            EguiPlugin,
             PhysicsPlugins::default(),
             PhysicsDebugPlugin::default(),
         ));
