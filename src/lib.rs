@@ -8,6 +8,8 @@ use bevy::{
 };
 use bevy_frame_count_log_prefix::prelude::FrameCountLogPrefixPlugin;
 
+use crate::game::camera::MainCamera;
+
 #[cfg(feature = "dev")]
 mod dev_tools;
 mod game;
@@ -100,6 +102,7 @@ enum AppSet {
 
 fn spawn_camera(mut commands: Commands) {
     commands.spawn((
+        MainCamera,
         Name::new("Camera"),
         Camera2dBundle::default(),
         // Render all UI to this camera.

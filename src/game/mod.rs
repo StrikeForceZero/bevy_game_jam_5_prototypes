@@ -5,7 +5,7 @@ use bevy::prelude::*;
 mod animation;
 pub mod assets;
 pub mod audio;
-mod camera;
+pub mod camera;
 mod movement;
 mod orbital;
 pub mod spawn;

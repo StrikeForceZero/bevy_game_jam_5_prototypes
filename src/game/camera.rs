@@ -1,10 +1,20 @@
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 
+use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
+
 pub(crate) fn plugin(app: &mut App) {
+    Types.register_types(app);
     app.add_systems(Update, pan_camera);
     app.add_systems(Update, zoom_camera);
 }
+
+#[derive(Component, Debug, Reflect, AutoRegisterType)]
+#[reflect(Component)]
+pub struct MainCamera;
+
+#[derive(RegisterTypeBinder)]
+pub struct Types;
 
 fn pan_camera(
     time: Res<Time>,
