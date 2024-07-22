@@ -10,9 +10,10 @@ use bevy::asset::{ReflectAsset, UntypedAssetId};
 use bevy::prelude::*;
 use bevy::reflect::TypeRegistry;
 use bevy::render::camera::{CameraProjection, Viewport};
+use bevy::utils::{HashMap, HashSet};
 use bevy::window::PrimaryWindow;
 use bevy_inspector_egui::{bevy_egui, bevy_inspector, DefaultInspectorConfigPlugin};
-use bevy_inspector_egui::bevy_egui::{EguiContext, EguiSet};
+use bevy_inspector_egui::bevy_egui::{EguiContext, EguiContexts, EguiSet};
 use bevy_inspector_egui::bevy_inspector::{
     ui_for_entities_shared_components, ui_for_entity_with_children,
 };
@@ -24,12 +25,13 @@ use transform_gizmo::GizmoMode;
 
 use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
 
-use crate::game::camera::MainCamera;
+use crate::game::camera::{MainCamera, MainCameraController};
 
 pub(crate) fn plugin(app: &mut App) {
     Types.register_types(app);
     app
         //
+        .configure_sets(Update, MainCameraController.run_if(is_game_view_focused))
         .insert_resource(UiState::new())
         .add_plugins(DefaultInspectorConfigPlugin)
         .add_systems(
@@ -89,9 +91,13 @@ impl UiState {
             .style(Style::from_egui(ctx.style().as_ref()))
             .show(ctx, &mut tab_viewer);
     }
+
+    fn state(&self) -> DockState<EguiWindow> {
+        self.state.clone()
+    }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum EguiWindow {
     GameView,
     Hierarchy,
@@ -100,6 +106,7 @@ enum EguiWindow {
     Inspector,
 }
 
+#[derive(Debug)]
 struct TabViewer<'a> {
     world: &'a mut World,
     selected_entities: &'a mut SelectedEntities,
@@ -347,5 +354,19 @@ fn select_asset(
                 }
             }
         });
+    }
+}
+
+pub fn is_game_view_focused(ui_state: Res<UiState>) -> bool {
+    let Some(_) = ui_state.state.focused_leaf() else {
+        return false;
+    };
+    let mut state = ui_state.state();
+    let Some((_, window)) = state.find_active_focused() else {
+        return false;
+    };
+    match window {
+        EguiWindow::GameView => true,
+        _ => false,
     }
 }
