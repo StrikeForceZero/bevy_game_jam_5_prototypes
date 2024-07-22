@@ -16,6 +16,7 @@ bevy = { version = "0.14", features = ["wayland"] }
 bevy_egui = { version = "0.28.0", features = ["immutable_ctx"] }
 bevy_frame_count_log_prefix = { git = "https://github.com/StrikeForceZero/bevy_frame_count_log_prefix" }
 bevy-inspector-egui = "0.25.1"
+bevy_mod_picking = { version = "0.20.0", features = ["all"] }
 derive_more = "0.99.18"
 egui = "0.28.1"
 egui_dock = "0.13.0"
@@ -29,6 +30,9 @@ ordered-float = { version = "4.2.1", features = ["serde"] }
 rand = "0.8"
 smart-default = "0.7.1"
 transform-gizmo = "0.3.0"
+
+[patch.crates-io]
+bevy_mod_raycast = { git = 'https://github.com/StrikeForceZero/bevy_mod_raycast.git', branch = "fix/118_edge_of_mesh_nan" }
 
 [features]
 default = [
