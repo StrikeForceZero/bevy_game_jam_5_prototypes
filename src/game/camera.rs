@@ -5,9 +5,12 @@ use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
 
 pub(crate) fn plugin(app: &mut App) {
     Types.register_types(app);
-    app.add_systems(Update, pan_camera);
-    app.add_systems(Update, zoom_camera);
+    app.add_systems(Update, pan_camera.in_set(MainCameraController));
+    app.add_systems(Update, zoom_camera.in_set(MainCameraController));
 }
+
+#[derive(SystemSet, Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct MainCameraController;
 
 #[derive(Component, Debug, Reflect, AutoRegisterType)]
 #[reflect(Component)]
