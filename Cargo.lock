@@ -722,6 +722,7 @@ dependencies = [
  "avian2d",
  "bevy",
  "bevy-inspector-egui",
+ "bevy_egui",
  "bevy_frame_count_log_prefix",
  "derive_more",
  "egui",
