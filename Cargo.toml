@@ -11,7 +11,7 @@ members = ["crates/*"]
 internal_proc_macros = { path = "crates/internal_proc_macros" }
 internal_shared = { path = "crates/internal_shared" }
 
-avian2d = "0.1"
+avian2d = { version = "0.1", features = ["default", "enhanced-determinism"] }
 bevy = { version = "0.14", features = ["wayland"] }
 bevy_frame_count_log_prefix = { git = "https://github.com/StrikeForceZero/bevy_frame_count_log_prefix" }
 bevy-inspector-egui = "0.25.1"
