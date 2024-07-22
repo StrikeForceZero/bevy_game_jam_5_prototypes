@@ -5,6 +5,7 @@
 
 use bevy::prelude::*;
 
+pub mod inspector;
 pub mod interaction;
 pub mod palette;
 mod widgets;
