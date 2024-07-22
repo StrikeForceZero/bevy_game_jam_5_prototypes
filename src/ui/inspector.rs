@@ -21,7 +21,7 @@ use bevy_inspector_egui::bevy_inspector::hierarchy::{hierarchy_ui, SelectedEntit
 use egui::Widget;
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use smart_default::SmartDefault;
-use transform_gizmo::GizmoMode;
+use transform_gizmo_bevy::{EnumSet, Gizmo, GizmoMode, GizmoOrientation, GizmoTarget};
 
 use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
 

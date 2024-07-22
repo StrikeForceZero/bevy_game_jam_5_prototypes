@@ -29,7 +29,7 @@ log = { version = "0.4", features = [
 ordered-float = { version = "4.2.1", features = ["serde"] }
 rand = "0.8"
 smart-default = "0.7.1"
-transform-gizmo = "0.3.0"
+transform-gizmo-bevy = "0.3.0"
 
 [patch.crates-io]
 bevy_mod_raycast = { git = 'https://github.com/StrikeForceZero/bevy_mod_raycast.git', branch = "fix/118_edge_of_mesh_nan" }
