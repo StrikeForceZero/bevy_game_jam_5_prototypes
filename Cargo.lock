@@ -724,6 +724,7 @@ dependencies = [
  "bevy-inspector-egui",
  "bevy_frame_count_log_prefix",
  "derive_more",
+ "egui",
  "internal_proc_macros",
  "internal_shared",
  "itertools 0.13.0",
