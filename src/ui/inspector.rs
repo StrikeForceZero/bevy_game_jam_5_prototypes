@@ -43,6 +43,9 @@ use transform_gizmo_bevy::mint::RowMatrix4;
 use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
 
 use crate::game::camera::{MainCamera, MainCameraController};
+use crate::game::orbital::celestial::CelestialBody;
+use crate::game::spawn::level::SpawnLevel;
+use crate::screen::Screen;
 
 pub(crate) fn plugin(app: &mut App) {
     Types.register_types(app);
@@ -92,7 +95,11 @@ impl UiState {
         let [game, _inspector] = tree.split_right(
             NodeIndex::root(),
             0.75,
-            vec![EguiWindow::Inspector, EguiWindow::Physics],
+            vec![
+                EguiWindow::Inspector,
+                EguiWindow::Physics,
+                EguiWindow::GameState,
+            ],
         );
         let [game, _hierarchy] = tree.split_left(game, 0.2, vec![EguiWindow::Hierarchy]);
         let [_game, _bottom] =
@@ -133,6 +140,7 @@ enum EguiWindow {
     Assets,
     Inspector,
     Physics,
+    GameState,
 }
 
 #[derive(Debug)]
@@ -323,6 +331,21 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                 ui.radio_value(&mut speed, Speed::Quad, ">>>> Quad");
 
                 speed.process(&mut time_physics);
+            }
+            EguiWindow::GameState => {
+                if ui.button("Reload World").clicked() {
+                    self.world.resource_mut::<Time<Physics>>().pause();
+                    let bodies = self
+                        .world
+                        .query_filtered::<Entity, With<CelestialBody>>()
+                        .iter(self.world)
+                        .collect::<Vec<_>>();
+                    for entity in bodies {
+                        self.world.commands().entity(entity).despawn_recursive();
+                    }
+                    self.world.commands().trigger(SpawnLevel);
+                    self.world.resource_mut::<Time<Physics>>().unpause();
+                }
             }
         }
     }
