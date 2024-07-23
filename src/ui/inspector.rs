@@ -4,9 +4,16 @@
 //  or
 //      Apache 2.0 - https://github.com/jakobhellermann/bevy-inspector-egui/blob/f931976fcff47bdf4fb42e039ee5881c667a2e1f/LICENSE-APACHE.md
 
+// Derived from: https://github.com/urholaukkarinen/transform-gizmo/blob/00be178c38a09a6a8df2ae4f557b7a12fcdafe14/examples/bevy/src/gui.rs
+// Original License:
+//      MIT - https://github.com/urholaukkarinen/transform-gizmo/blob/00be178c38a09a6a8df2ae4f557b7a12fcdafe14/LICENSE-APACHE
+//  or
+//      Apache 2.0 - https://github.com/urholaukkarinen/transform-gizmo/blob/00be178c38a09a6a8df2ae4f557b7a12fcdafe14/LICENSE-MIT
+
 use std::any::TypeId;
 
 use bevy::asset::{ReflectAsset, UntypedAssetId};
+use bevy::math::DQuat;
 use bevy::prelude::*;
 use bevy::reflect::TypeRegistry;
 use bevy::render::camera::{CameraProjection, Viewport};
@@ -18,10 +25,17 @@ use bevy_inspector_egui::bevy_inspector::{
     ui_for_entities_shared_components, ui_for_entity_with_children,
 };
 use bevy_inspector_egui::bevy_inspector::hierarchy::{hierarchy_ui, SelectedEntities};
+use bevy_mod_picking::picking_core::PickingPluginsSettings;
+use bevy_mod_picking::prelude::{HighlightPluginSettings, PickSelection};
+use bevy_mod_picking::selection::SelectionPluginSettings;
 use egui::Widget;
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use smart_default::SmartDefault;
-use transform_gizmo_bevy::{EnumSet, Gizmo, GizmoMode, GizmoOrientation, GizmoTarget};
+use transform_gizmo_bevy::{
+    EnumSet, Gizmo, GizmoCamera, GizmoInteraction, GizmoMode, GizmoOptions, GizmoOrientation,
+    GizmoResult, GizmoTarget, GizmoVisuals,
+};
+use transform_gizmo_bevy::mint::RowMatrix4;
 
 use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
 
@@ -33,6 +47,11 @@ pub(crate) fn plugin(app: &mut App) {
         //
         .configure_sets(Update, MainCameraController.run_if(is_game_view_focused))
         .insert_resource(UiState::new())
+        .insert_resource(SelectionPluginSettings {
+            click_nothing_deselect_all: false,
+            ..default()
+        })
+        .insert_resource(HighlightPluginSettings { is_enabled: false })
         .add_plugins(DefaultInspectorConfigPlugin)
         .add_systems(
             PostUpdate,
@@ -41,7 +60,10 @@ pub(crate) fn plugin(app: &mut App) {
                 .before(TransformSystem::TransformPropagate),
         )
         .add_systems(PostUpdate, set_camera_viewport.after(show_ui_system))
-        .add_systems(Update, set_gizmo_mode);
+        // TODO: not useful until 2d support is added
+        // .add_systems(Update, set_gizmo_mode)
+        .add_systems(PreUpdate, toggle_picking_enabled)
+        .add_systems(Update, update_picking);
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -130,7 +152,44 @@ impl egui_dock::TabViewer for TabViewer<'_> {
             EguiWindow::GameView => {
                 *self.viewport_rect = ui.clip_rect();
 
-                draw_gizmo(ui, self.world, self.selected_entities, self.gizmo_mode);
+                egui::Frame::none()
+                    .outer_margin(egui::Margin::same(10.0))
+                    .show(ui, |ui| {
+                        let label = match self.gizmo_mode {
+                            GizmoMode::RotateX => "RotateX",
+                            GizmoMode::RotateY => "RotateY",
+                            GizmoMode::RotateZ => "RotateZ",
+                            GizmoMode::RotateView => "RotateView",
+                            GizmoMode::TranslateX => "TranslateX",
+                            GizmoMode::TranslateY => "TranslateY",
+                            GizmoMode::TranslateZ => "TranslateZ",
+                            GizmoMode::TranslateXY => "TranslateXY",
+                            GizmoMode::TranslateXZ => "TranslateXZ",
+                            GizmoMode::TranslateYZ => "TranslateYZ",
+                            GizmoMode::TranslateView => "TranslateView",
+                            GizmoMode::ScaleX => "ScaleX",
+                            GizmoMode::ScaleY => "ScaleY",
+                            GizmoMode::ScaleZ => "ScaleZ",
+                            GizmoMode::ScaleXY => "ScaleXY",
+                            GizmoMode::ScaleXZ => "ScaleXZ",
+                            GizmoMode::ScaleYZ => "ScaleYZ",
+                            GizmoMode::ScaleUniform => "ScaleUniform",
+                            GizmoMode::Arcball => "Arcball",
+                        };
+                        ui.label(format!("Mode: {label}"));
+                    });
+
+                let mut gizmo_options = self.world.resource_mut::<GizmoOptions>();
+                // TODO: only shows gizmo in 3d so only allow translation for now
+                gizmo_options.gizmo_modes = EnumSet::only(GizmoMode::TranslateView);
+
+                let latest_gizmo_result = self
+                    .world
+                    .query::<&GizmoTarget>()
+                    .iter(self.world)
+                    .find_map(|target| target.latest_result());
+
+                draw_gizmo_result(ui, latest_gizmo_result);
             }
             EguiWindow::Hierarchy => {
                 let selected = hierarchy_ui(self.world, ui, self.selected_entities);
@@ -229,62 +288,113 @@ fn set_camera_viewport(
     }
 }
 
+fn toggle_picking_enabled(
+    gizmo_targets: Query<&transform_gizmo_bevy::GizmoTarget>,
+    mut picking_settings: ResMut<PickingPluginsSettings>,
+) {
+    // Picking is disabled when any of the gizmos is focused or active.
+
+    picking_settings.is_enabled = gizmo_targets
+        .iter()
+        .all(|target| !target.is_focused() && !target.is_active());
+}
+
+fn update_picking(
+    mut commands: Commands,
+    targets: Query<(Entity, Ref<PickSelection>, Option<&GizmoTarget>), Changed<PickSelection>>,
+) {
+    // Continuously update entities based on their picking state
+
+    for (entity, pick_selection, gizmo_target) in targets.iter() {
+        if !pick_selection.is_changed() {
+            continue;
+        }
+        let mut entity_cmd = commands.entity(entity);
+
+        if pick_selection.is_selected {
+            if gizmo_target.is_none() {
+                entity_cmd.insert(GizmoTarget::default());
+            }
+            debug!("outline: {entity}");
+            commands
+                .entity(entity)
+                .insert(crate::game::util::outline::Outline::default());
+        } else {
+            entity_cmd.remove::<GizmoTarget>();
+
+            commands
+                .entity(entity)
+                .remove::<crate::game::util::outline::Outline>();
+        }
+    }
+}
+
 fn set_gizmo_mode(input: Res<ButtonInput<KeyCode>>, mut ui_state: ResMut<UiState>) {
     for (key, mode) in [
         (KeyCode::KeyR, GizmoMode::RotateZ),
         (KeyCode::KeyT, GizmoMode::TranslateXY),
         (KeyCode::KeyS, GizmoMode::ScaleXY),
     ] {
-        if input.just_pressed(key) {
+        if input.pressed(KeyCode::ControlLeft) && input.just_pressed(key) {
             ui_state.gizmo_mode = mode;
         }
     }
 }
 
-#[allow(unused)]
-fn draw_gizmo(
-    ui: &mut egui::Ui,
-    world: &mut World,
-    selected_entities: &SelectedEntities,
-    gizmo_mode: GizmoMode,
-) {
-    let (cam_transform, projection) = world
-        .query_filtered::<(&GlobalTransform, &OrthographicProjection), With<MainCamera>>()
-        .single(world);
-    let view_matrix = Mat4::from(cam_transform.affine().inverse());
-    let projection_matrix = projection.get_clip_from_view();
+trait ToRowMatrix4F64 {
+    fn convert_to_row_matrix4_f64(&self) -> RowMatrix4<f64>;
+}
 
-    if selected_entities.len() != 1 {
-        return;
+impl ToRowMatrix4F64 for Mat4 {
+    fn convert_to_row_matrix4_f64(&self) -> RowMatrix4<f64> {
+        RowMatrix4::<f64>::from(self.to_cols_array_2d().map(|c| c.map(|v| v as f64)))
     }
+}
 
-    /*for selected in selected_entities.iter() {
-        let Some(transform) = world.get::<Transform>(selected) else {
-            continue;
+fn draw_gizmo_result(ui: &mut egui::Ui, gizmo_result: Option<GizmoResult>) {
+    if let Some(result) = gizmo_result {
+        let text = match result {
+            GizmoResult::Rotation {
+                axis,
+                delta: _,
+                total,
+                is_view_axis: _,
+            } => {
+                format!(
+                    "Rotation axis: ({:.2}, {:.2}, {:.2}), Angle: {:.2} deg",
+                    axis.x,
+                    axis.y,
+                    axis.z,
+                    total.to_degrees()
+                )
+            }
+            GizmoResult::Translation { delta: _, total } => {
+                format!(
+                    "Translation: ({:.2}, {:.2}, {:.2})",
+                    total.x, total.y, total.z,
+                )
+            }
+            GizmoResult::Scale { total } => {
+                format!("Scale: ({:.2}, {:.2}, {:.2})", total.x, total.y, total.z,)
+            }
+            GizmoResult::Arcball { delta: _, total } => {
+                let (axis, angle) = DQuat::from(total).to_axis_angle();
+                format!(
+                    "Rotation axis: ({:.2}, {:.2}, {:.2}), Angle: {:.2} deg",
+                    axis.x,
+                    axis.y,
+                    axis.z,
+                    angle.to_degrees()
+                )
+            }
         };
-        let model_matrix = transform.compute_matrix();
 
-        let mut gizmo = Gizmo::new(GizmoConfig {
-            view_matrix: view_matrix.into(),
-            projection_matrix: projection_matrix.into(),
-            orientation: GizmoOrientation::Local,
-            modes: EnumSet::from(gizmo_mode),
-            ..Default::default()
-        });
-        let Some([result]) = gizmo
-            .interact(ui, model_matrix.into())
-            .map(|(_, res)| res.as_slice())
-        else {
-            continue;
-        };
-
-        let mut transform = world.get_mut::<Transform>(selected).unwrap();
-        transform = Transform {
-            translation: Vec3::from(<[f64; 3]>::from(result.translation)),
-            rotation: Quat::from_array(<[f64; 4]>::from(result.rotation)),
-            scale: Vec3::from(<[f64; 3]>::from(result.scale)),
-        };
-    }*/
+        egui::Frame::none()
+            .outer_margin(egui::Margin::same(10.0))
+            .show(ui, |ui| {
+                ui.label(text);
+            });
+    }
 }
 
 fn select_resource(
