@@ -1,7 +1,11 @@
 use std::fmt::Formatter;
 
+use avian2d::dynamics::integrator::IntegrationSet;
 use avian2d::math::Vector;
-use avian2d::prelude::{Collider, LinearVelocity, Mass, Physics, RigidBody};
+use avian2d::prelude::{
+    Collider, LinearVelocity, Mass, Physics, PhysicsSchedule, PhysicsSet, PhysicsStepSet,
+    RigidBody, SolverSet,
+};
 use bevy::asset::Assets;
 use bevy::color::palettes::basic::YELLOW;
 use bevy::color::palettes::css::{RED, TEAL};
@@ -10,8 +14,8 @@ use bevy::prelude::{
     Added, App, AppGizmoBuilder, BuildChildren, Bundle, Changed, Children, Circle, Color, Commands,
     Component, DetectChanges, Entity, FixedUpdate, GizmoConfigGroup, GizmoConfigStore, Gizmos,
     Handle, HierarchyQueryExt, IntoSystemConfigs, Mesh, Mut, Name, Query, Ref, Reflect,
-    ReflectComponent, ReflectResource, Res, ResMut, Resource, Startup, Time, Transform, Update,
-    Vec2, Visibility, With,
+    ReflectComponent, ReflectResource, Res, ResMut, Resource, Startup, SystemSet, Time, Transform,
+    Update, Vec2, Visibility, With,
 };
 use bevy::sprite::{ColorMaterial, ColorMesh2dBundle, Mesh2dHandle};
 use bevy::ui::Display;
@@ -33,10 +37,22 @@ pub(crate) fn plugin(app: &mut App) {
     app.init_resource::<ForceScale>();
     app.init_resource::<RatioFloor>();
     app.add_systems(Update, on_added);
-    app.add_systems(FixedUpdate, (clear_force_lines, physics_update).chain());
+    app.configure_sets(PhysicsSchedule, OrbitalPhysicsSchedule);
+    app.add_systems(
+        PhysicsSchedule,
+        (clear_force_lines, physics_update)
+            .chain()
+            .in_set(OrbitalPhysicsSchedule)
+            .before(IntegrationSet::Velocity)
+            .before(PhysicsStepSet::Solver)
+            .after(PhysicsStepSet::NarrowPhase),
+    );
     app.init_gizmo_group::<DebugCelestialGizmos>()
         .add_systems(Update, draw_lines);
 }
+
+#[derive(SystemSet, Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct OrbitalPhysicsSchedule;
 
 #[derive(
     Resource, Debug, Copy, Clone, SmartDefault, Reflect, InspectorOptions, AutoRegisterType,
