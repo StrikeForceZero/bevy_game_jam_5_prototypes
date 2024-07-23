@@ -41,6 +41,7 @@ pub struct DebugCelestialGizmos {
 
 #[derive(Component, Debug, Copy, Clone, Hash, Eq, PartialEq, Display, SmartDefault)]
 pub enum CelestialMesh {
+    #[display(fmt = "Standard({})", _0)]
     #[default]
     Standard(ordered_float::OrderedFloat<f32>),
 }
