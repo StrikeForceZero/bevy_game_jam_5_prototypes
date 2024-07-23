@@ -7,7 +7,7 @@ pub mod assets;
 pub mod audio;
 pub mod camera;
 mod movement;
-mod orbital;
+pub mod orbital;
 pub mod spawn;
 pub mod util;
 
