@@ -383,10 +383,12 @@ fn toggle_picking_enabled(
 
 fn update_picking(
     mut commands: Commands,
+    mut ui_state: ResMut<UiState>,
     targets: Query<(Entity, Ref<PickSelection>, Option<&GizmoTarget>), Changed<PickSelection>>,
 ) {
     // Continuously update entities based on their picking state
 
+    let mut new_selection = vec![];
     for (entity, pick_selection, gizmo_target) in targets.iter() {
         if !pick_selection.is_changed() {
             continue;
@@ -401,12 +403,24 @@ fn update_picking(
             commands
                 .entity(entity)
                 .insert(crate::game::util::outline::Outline::default());
+
+            new_selection.push(entity);
         } else {
             entity_cmd.remove::<GizmoTarget>();
 
             commands
                 .entity(entity)
                 .remove::<crate::game::util::outline::Outline>();
+        }
+    }
+    if !new_selection.is_empty() {
+        ui_state.selected_entities.clear();
+        for entity in new_selection.into_iter() {
+            // TODO: this only replaces with the last selected because we are querying on changed. 
+            // we need to query all entities with pick selection to check for selection 
+            // or
+            // to optimized we would need a marker component to track selected
+            ui_state.selected_entities.select_maybe_add(entity, true);
         }
     }
 }
