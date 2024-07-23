@@ -12,7 +12,9 @@
 
 use std::any::TypeId;
 
+use avian2d::prelude::{Physics, PhysicsTime, TimestepMode};
 use bevy::asset::{ReflectAsset, UntypedAssetId};
+use bevy::log::tracing_subscriber::fmt::time;
 use bevy::math::DQuat;
 use bevy::prelude::*;
 use bevy::reflect::TypeRegistry;
@@ -86,8 +88,11 @@ impl UiState {
     pub fn new() -> Self {
         let mut state = DockState::new(vec![EguiWindow::GameView]);
         let tree = state.main_surface_mut();
-        let [game, _inspector] =
-            tree.split_right(NodeIndex::root(), 0.75, vec![EguiWindow::Inspector]);
+        let [game, _inspector] = tree.split_right(
+            NodeIndex::root(),
+            0.75,
+            vec![EguiWindow::Inspector, EguiWindow::Physics],
+        );
         let [game, _hierarchy] = tree.split_left(game, 0.2, vec![EguiWindow::Hierarchy]);
         let [_game, _bottom] =
             tree.split_below(game, 0.8, vec![EguiWindow::Resources, EguiWindow::Assets]);
@@ -126,6 +131,7 @@ enum EguiWindow {
     Resources,
     Assets,
     Inspector,
+    Physics,
 }
 
 #[derive(Debug)]
@@ -225,6 +231,82 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                     );
                 }
             },
+            EguiWindow::Physics => {
+                let mut time_physics = self.world.resource_mut::<Time<Physics>>();
+                ui.heading("Physics");
+
+                #[derive(Debug, PartialEq)]
+                enum Speed {
+                    Paused,
+                    Single,
+                    Double,
+                    Triple,
+                    Quad,
+                }
+
+                impl Speed {
+                    fn get(time_physics: &Mut<Time<Physics>>) -> Self {
+                        let is_paused = time_physics.is_paused();
+                        let speed = time_physics.relative_speed();
+                        match (is_paused, speed) {
+                            (true, _) => Self::Paused,
+                            (false, 1.0) => Self::Single,
+                            (false, 2.0) => Self::Double,
+                            (false, 3.0) => Self::Triple,
+                            (false, 4.0) => Self::Quad,
+                            _ => panic!("unknown speed {speed}"),
+                        }
+                    }
+                    fn process(&self, time_physics: &mut Mut<Time<Physics>>) {
+                        let is_paused = time_physics.is_paused();
+                        let speed = time_physics.relative_speed();
+                        match self {
+                            Speed::Paused => {
+                                if !is_paused {
+                                    time_physics.pause();
+                                }
+                            }
+                            Speed::Single => {
+                                if is_paused || speed != 1.0 {
+                                    time_physics.unpause();
+                                    time_physics.set_relative_speed(1.0);
+                                }
+                            }
+                            Speed::Double => {
+                                if is_paused || speed != 2.0 {
+                                    time_physics.unpause();
+                                    time_physics.set_relative_speed(2.0);
+                                    // TODO: should probably increase resolution
+                                }
+                            }
+                            Speed::Triple => {
+                                if is_paused || speed != 3.0 {
+                                    time_physics.unpause();
+                                    time_physics.set_relative_speed(3.0);
+                                    // TODO: should probably increase resolution
+                                }
+                            }
+                            Speed::Quad => {
+                                if is_paused || speed != 4.0 {
+                                    time_physics.unpause();
+                                    time_physics.set_relative_speed(4.0);
+                                    // TODO: should probably increase resolution
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let mut speed = Speed::get(&time_physics);
+
+                ui.radio_value(&mut speed, Speed::Paused, "|| Pause");
+                ui.radio_value(&mut speed, Speed::Single, "> Play");
+                ui.radio_value(&mut speed, Speed::Double, ">> Double");
+                ui.radio_value(&mut speed, Speed::Triple, ">>> Triple");
+                ui.radio_value(&mut speed, Speed::Quad, ">>>> Quad");
+
+                speed.process(&mut time_physics);
+            }
         }
     }
 
