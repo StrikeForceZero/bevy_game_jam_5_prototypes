@@ -7,14 +7,15 @@ use bevy::color::palettes::basic::YELLOW;
 use bevy::color::palettes::css::{RED, TEAL};
 use bevy::ecs::query::QueryData;
 use bevy::prelude::{
-    Added, App, AppGizmoBuilder, Bundle, Circle, Color, Commands, Component, DetectChanges, Entity,
-    FixedUpdate, GizmoConfigGroup, GizmoConfigStore, Gizmos, Handle, IntoSystemConfigs, Mesh, Mut,
-    Name, Query, Ref, Reflect, ReflectComponent, Res, ResMut, Startup, Transform, Update, Vec2,
-    With,
+    Added, App, AppGizmoBuilder, BuildChildren, Bundle, Changed, Children, Circle, Color, Commands,
+    Component, DetectChanges, Entity, FixedUpdate, GizmoConfigGroup, GizmoConfigStore, Gizmos,
+    Handle, HierarchyQueryExt, IntoSystemConfigs, Mesh, Mut, Name, Query, Ref, Reflect,
+    ReflectComponent, Res, ResMut, Startup, Transform, Update, Vec2, Visibility, With,
 };
 use bevy::sprite::{ColorMaterial, ColorMesh2dBundle, Mesh2dHandle};
 use bevy::ui::Display;
 use bevy::utils::{default, EntityHash, EntityHashMap, HashMap};
+use bevy_mod_picking::PickableBundle;
 use derive_more::Display;
 use itertools::Itertools;
 use log::debug;
@@ -65,7 +66,7 @@ pub struct CelestialBody;
 #[derive(Component, Debug, Clone, Default, Reflect, AutoRegisterType)]
 pub struct CelestialBodyColor(pub Color);
 
-#[derive(Bundle, Clone, Default)]
+#[derive(Bundle, Default)]
 pub struct CelestialBodyBundle {
     celestial_body: CelestialBody,
     rigid_body: RigidBody,
@@ -74,6 +75,27 @@ pub struct CelestialBodyBundle {
     mesh: ColorMesh2dBundle,
     celestial_mesh: CelestialMesh,
     celestial_body_color: CelestialBodyColor,
+    pickable_bundle: PickableBundle,
+}
+
+impl Clone for CelestialBodyBundle {
+    fn clone(&self) -> Self {
+        Self {
+            celestial_body: self.celestial_body.clone(),
+            rigid_body: self.rigid_body.clone(),
+            collider: self.collider.clone(),
+            mass: self.mass.clone(),
+            mesh: self.mesh.clone(),
+            celestial_mesh: self.celestial_mesh.clone(),
+            celestial_body_color: self.celestial_body_color.clone(),
+            pickable_bundle: PickableBundle {
+                pickable: self.pickable_bundle.pickable.clone(),
+                interaction: self.pickable_bundle.interaction.clone(),
+                selection: self.pickable_bundle.selection.clone(),
+                highlight: self.pickable_bundle.highlight.clone(),
+            },
+        }
+    }
 }
 
 impl CelestialBodyBundle {
@@ -86,6 +108,7 @@ impl CelestialBodyBundle {
             mesh: ColorMesh2dBundle::default(),
             celestial_mesh: CelestialMesh::Standard(ordered_float::OrderedFloat(radius)),
             celestial_body_color: CelestialBodyColor(color.into()),
+            pickable_bundle: PickableBundle::default(),
         }
     }
     pub fn with_transform(mut self, transform: Transform) -> Self {
