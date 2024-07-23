@@ -9,6 +9,7 @@ use bevy::{
 use bevy_frame_count_log_prefix::prelude::FrameCountLogPrefixPlugin;
 use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_mod_picking::DefaultPickingPlugins;
+use transform_gizmo_bevy::{GizmoCamera, TransformGizmoPlugin};
 
 use crate::game::camera::MainCamera;
 
@@ -68,6 +69,7 @@ impl Plugin for AppPlugin {
             // multiline
             FrameCountLogPrefixPlugin,
             EguiPlugin,
+            TransformGizmoPlugin,
             DefaultPickingPlugins,
             PhysicsPlugins::default(),
             PhysicsDebugPlugin::default(),
@@ -107,6 +109,7 @@ enum AppSet {
 fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         MainCamera,
+        GizmoCamera,
         Name::new("Camera"),
         Camera2dBundle::default(),
         // Render all UI to this camera.
