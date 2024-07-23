@@ -1,7 +1,7 @@
 use std::fmt::Formatter;
 
 use avian2d::math::Vector;
-use avian2d::prelude::{Collider, LinearVelocity, Mass, RigidBody};
+use avian2d::prelude::{Collider, LinearVelocity, Mass, Physics, RigidBody};
 use bevy::asset::Assets;
 use bevy::color::palettes::basic::YELLOW;
 use bevy::color::palettes::css::{RED, TEAL};
@@ -10,7 +10,7 @@ use bevy::prelude::{
     Added, App, AppGizmoBuilder, BuildChildren, Bundle, Changed, Children, Circle, Color, Commands,
     Component, DetectChanges, Entity, FixedUpdate, GizmoConfigGroup, GizmoConfigStore, Gizmos,
     Handle, HierarchyQueryExt, IntoSystemConfigs, Mesh, Mut, Name, Query, Ref, Reflect,
-    ReflectComponent, Res, ResMut, Startup, Transform, Update, Vec2, Visibility, With,
+    ReflectComponent, Res, ResMut, Startup, Time, Transform, Update, Vec2, Visibility, With,
 };
 use bevy::sprite::{ColorMaterial, ColorMesh2dBundle, Mesh2dHandle};
 use bevy::ui::Display;
@@ -234,8 +234,9 @@ fn compute_forces(bodies: &mut Vec<BodyPhysicsData>) {
     }
 }
 
-const FORCE_SCALE: f32 = 10000.0;
+const FORCE_SCALE: f32 = 100000.0 * 7.5;
 fn physics_update(
+    time: Res<Time<Physics>>,
     mut celestial_q: Query<PhysicsUpdateQueryData, With<CelestialBody>>,
     mut config_store: ResMut<GizmoConfigStore>,
 ) {
@@ -253,7 +254,7 @@ fn physics_update(
         let Some(body) = body_map.get(&item.entity) else {
             unreachable!();
         };
-        let force = body.force_to_apply * FORCE_SCALE;
+        let force = body.force_to_apply * FORCE_SCALE * time.delta_seconds();
 
         for (force_entity, force_body_force) in body.force_map.iter() {
             let Some(force_body) = body_map.get(force_entity) else {
@@ -262,7 +263,7 @@ fn physics_update(
             debug_gizmos.force_lines.push((
                 body.pos,
                 force_body.pos,
-                *force_body_force * FORCE_SCALE,
+                *force_body_force * FORCE_SCALE * time.delta_seconds(),
             ));
         }
 
