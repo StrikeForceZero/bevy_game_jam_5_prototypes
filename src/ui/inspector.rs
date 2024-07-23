@@ -12,7 +12,8 @@
 
 use std::any::TypeId;
 
-use avian2d::prelude::{Physics, PhysicsTime, TimestepMode};
+use avian2d::math::Vector;
+use avian2d::prelude::{LinearVelocity, Physics, PhysicsTime, TimestepMode};
 use bevy::asset::{ReflectAsset, UntypedAssetId};
 use bevy::log::tracing_subscriber::fmt::time;
 use bevy::math::DQuat;
@@ -189,13 +190,29 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                 // TODO: only shows gizmo in 3d so only allow translation for now
                 gizmo_options.gizmo_modes = EnumSet::only(GizmoMode::TranslateView);
 
-                let latest_gizmo_result = self
+                let Some((entity, has_velocity, latest_gizmo_result)) = self
                     .world
-                    .query::<&GizmoTarget>()
+                    .query::<(Entity, Has<LinearVelocity>, &GizmoTarget)>()
                     .iter(self.world)
-                    .find_map(|target| target.latest_result());
+                    .find_map(|(entity, has_velocity, target)| {
+                        target
+                            .latest_result()
+                            .map(|result| (entity, has_velocity, result))
+                    })
+                else {
+                    return;
+                };
 
-                draw_gizmo_result(ui, latest_gizmo_result);
+                if has_velocity {
+                    if let GizmoResult::Translation { delta, .. } = &latest_gizmo_result {
+                        self.world
+                            .commands()
+                            .entity(entity)
+                            .insert(LinearVelocity(Vector::new(delta.x as f32, delta.y as f32)));
+                    }
+                }
+
+                draw_gizmo_result(ui, Some(latest_gizmo_result));
             }
             EguiWindow::Hierarchy => {
                 let selected = hierarchy_ui(self.world, ui, self.selected_entities);
@@ -416,8 +433,8 @@ fn update_picking(
     if !new_selection.is_empty() {
         ui_state.selected_entities.clear();
         for entity in new_selection.into_iter() {
-            // TODO: this only replaces with the last selected because we are querying on changed. 
-            // we need to query all entities with pick selection to check for selection 
+            // TODO: this only replaces with the last selected because we are querying on changed.
+            // we need to query all entities with pick selection to check for selection
             // or
             // to optimized we would need a marker component to track selected
             ui_state.selected_entities.select_maybe_add(entity, true);
