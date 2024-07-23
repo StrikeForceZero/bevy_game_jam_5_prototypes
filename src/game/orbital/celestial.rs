@@ -10,11 +10,13 @@ use bevy::prelude::{
     Added, App, AppGizmoBuilder, BuildChildren, Bundle, Changed, Children, Circle, Color, Commands,
     Component, DetectChanges, Entity, FixedUpdate, GizmoConfigGroup, GizmoConfigStore, Gizmos,
     Handle, HierarchyQueryExt, IntoSystemConfigs, Mesh, Mut, Name, Query, Ref, Reflect,
-    ReflectComponent, Res, ResMut, Startup, Time, Transform, Update, Vec2, Visibility, With,
+    ReflectComponent, ReflectResource, Res, ResMut, Resource, Startup, Time, Transform, Update,
+    Vec2, Visibility, With,
 };
 use bevy::sprite::{ColorMaterial, ColorMesh2dBundle, Mesh2dHandle};
 use bevy::ui::Display;
 use bevy::utils::{default, EntityHash, EntityHashMap, HashMap};
+use bevy_inspector_egui::prelude::{InspectorOptions, ReflectInspectorOptions};
 use bevy_mod_picking::PickableBundle;
 use derive_more::Display;
 use itertools::Itertools;
@@ -28,10 +30,42 @@ use crate::util::prototype_mesh_manager::{PrototypeMesh, PrototypeMeshId, Protot
 
 pub(crate) fn plugin(app: &mut App) {
     Types.register_types(app);
+    app.init_resource::<ForceScale>();
+    app.init_resource::<RatioFloor>();
     app.add_systems(Update, on_added);
     app.add_systems(FixedUpdate, (clear_force_lines, physics_update).chain());
     app.init_gizmo_group::<DebugCelestialGizmos>()
         .add_systems(Update, draw_lines);
+}
+
+#[derive(
+    Resource, Debug, Copy, Clone, SmartDefault, Reflect, InspectorOptions, AutoRegisterType,
+)]
+#[reflect(Resource, InspectorOptions)]
+pub struct ForceScale(
+    #[inspector(min = 0.0)]
+    #[default(100000.0 * 7.5)]
+    pub f32,
+);
+
+#[derive(
+    Resource, Debug, Copy, Clone, SmartDefault, Reflect, InspectorOptions, AutoRegisterType,
+)]
+#[reflect(Resource, InspectorOptions)]
+pub struct RatioFloor(
+    #[inspector(min = 0.0, max = 1.0)]
+    #[default(0.1)]
+    pub f32,
+);
+
+impl RatioFloor {
+    pub fn offset(&self) -> f32 {
+        1.0 - self.0
+    }
+
+    pub fn normalize(&self, value: f32) -> f32 {
+        self.0 + value * self.offset()
+    }
 }
 
 #[derive(Default, Reflect, GizmoConfigGroup, AutoRegisterType)]
@@ -234,9 +268,9 @@ fn compute_forces(bodies: &mut Vec<BodyPhysicsData>) {
     }
 }
 
-const FORCE_SCALE: f32 = 100000.0 * 7.5;
 fn physics_update(
     time: Res<Time<Physics>>,
+    force_scale: Res<ForceScale>,
     mut celestial_q: Query<PhysicsUpdateQueryData, With<CelestialBody>>,
     mut config_store: ResMut<GizmoConfigStore>,
 ) {
@@ -254,7 +288,7 @@ fn physics_update(
         let Some(body) = body_map.get(&item.entity) else {
             unreachable!();
         };
-        let force = body.force_to_apply * FORCE_SCALE * time.delta_seconds();
+        let force = body.force_to_apply * force_scale.0 * time.delta_seconds();
 
         for (force_entity, force_body_force) in body.force_map.iter() {
             let Some(force_body) = body_map.get(force_entity) else {
@@ -263,7 +297,7 @@ fn physics_update(
             debug_gizmos.force_lines.push((
                 body.pos,
                 force_body.pos,
-                *force_body_force * FORCE_SCALE * time.delta_seconds(),
+                *force_body_force * force_scale.0 * time.delta_seconds(),
             ));
         }
 
@@ -280,7 +314,7 @@ fn physics_update(
     }
 }
 
-fn draw_lines(mut debug_gizmos: Gizmos<DebugCelestialGizmos>) {
+fn draw_lines(ratio_floor: Res<RatioFloor>, mut debug_gizmos: Gizmos<DebugCelestialGizmos>) {
     for (_, points) in debug_gizmos.config_ext.point_map.iter() {
         let mut color = Color::from(TEAL);
         for (a, b) in points.iter().rev().tuple_windows() {
@@ -309,13 +343,9 @@ fn draw_lines(mut debug_gizmos: Gizmos<DebugCelestialGizmos>) {
         .minmax_by(|(.., a), (.., b)| a.cmp(b))
         .into_option()
     {
-        const RATIO_FLOOR: f32 = 0.01;
-        const RATIO_FLOOR_OFFSET: f32 = 1.0 - RATIO_FLOOR;
         for &(a, b, force) in debug_gizmos.config_ext.force_lines.iter() {
             let ratio = (force.length_squared() - *min_force) / (*max_force - *min_force);
-            // TODO: only to test to make sure all lines are there
-            // set ratio floor to 0.25 and scale everything to fit inside it
-            let ratio = RATIO_FLOOR + ratio * RATIO_FLOOR_OFFSET;
+            let ratio = ratio_floor.normalize(ratio);
             debug_gizmos.line_2d(a, b, Color::srgba(1.0, 1.0, 1.0, ratio));
         }
     }
