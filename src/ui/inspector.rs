@@ -44,7 +44,7 @@ use transform_gizmo_bevy::mint::RowMatrix4;
 
 use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
 
-use crate::game::camera::{MainCamera, MainCameraController};
+use crate::game::camera::{Focus, MainCamera, MainCameraControllerSet};
 use crate::game::spawn::level::SpawnLevel;
 use crate::screen::Screen;
 
@@ -53,7 +53,7 @@ pub(crate) fn plugin(app: &mut App) {
     app
         //
         .add_event::<Select>()
-        .configure_sets(Update, MainCameraController.run_if(is_game_view_focused))
+        .configure_sets(Update, MainCameraControllerSet.run_if(is_game_view_focused))
         .insert_resource(UiState::new())
         .insert_resource(SelectionPluginSettings {
             click_nothing_deselect_all: false,
@@ -83,14 +83,6 @@ pub struct Select(Entity);
 #[derive(Component, Debug, Clone, Default, Reflect, AutoRegisterType)]
 #[reflect(Component)]
 pub struct Selected;
-
-#[derive(Component, Debug, Clone, Default, Reflect, AutoRegisterType)]
-#[reflect(Component)]
-pub enum Focus {
-    #[default]
-    Normal,
-    Follow,
-}
 
 #[derive(Debug, Eq, PartialEq)]
 enum InspectorSelection {
@@ -273,6 +265,11 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                             if last_action_changed {
                                 *self.last_selection_action = last_action;
                                 log::debug!("inspector entity selection changed {last_action:?}");
+                                let target_camera = self
+                                    .world
+                                    .query_filtered::<Entity, With<MainCamera>>()
+                                    .get_single(self.world)
+                                    .expect("Failed to get MainCamera");
                                 if let Some((selection_mode, selection_action_entity)) = last_action
                                 {
                                     let mut selected_entities_to_remove = self
@@ -305,7 +302,7 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                                         }
                                         if !has_focus {
                                             log::debug!("adding follow {current_entity}");
-                                            entity_commands.insert(Focus::Follow);
+                                            entity_commands.insert(Focus::follow(target_camera));
                                         }
                                     }
                                     for entity in selected_entities_to_remove {
@@ -563,9 +560,7 @@ fn on_select(
 
 fn update_selected(
     mut commands: Commands,
-    mut main_camera_transform: Query<Mut<Transform>, With<MainCamera>>,
     newly_selected: Query<(Entity, Ref<Selected>, Has<Focus>), Added<Selected>>,
-    all_selected: Query<(Entity, &GlobalTransform, &Focus), (With<Selected>, With<Focus>)>,
     mut select_evw: EventWriter<Select>,
 ) {
     for (selected_entity, selected_ref, has_focus) in newly_selected.iter() {
@@ -580,27 +575,6 @@ fn update_selected(
         entity_commands.insert(PickSelection { is_selected: true });
         // delay the inspector selection by a frame
         select_evw.send(Select(selected_entity));
-    }
-
-    {
-        // make camera follow selection
-        let selected_transforms = all_selected
-            .iter()
-            .filter_map(|(_, t, focus)| match focus {
-                Focus::Normal => None,
-                Focus::Follow => Some(t),
-            })
-            .collect::<Vec<_>>();
-        let transform_count = selected_transforms.len();
-        if transform_count > 0 {
-            let average_translation = selected_transforms
-                .into_iter()
-                .fold(Vec3::ZERO, |sum, next| sum + next.translation())
-                / transform_count as f32;
-            for mut camera_transform in main_camera_transform.iter_mut() {
-                camera_transform.translation = average_translation;
-            }
-        }
     }
 }
 
