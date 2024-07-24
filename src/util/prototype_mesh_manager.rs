@@ -8,16 +8,14 @@ use derive_more::Display;
 
 use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
 
+use crate::util::string::AnyString;
+
 pub(super) fn plugin(app: &mut App) {
     Types.register_types(app);
     app.init_resource::<PrototypeMeshManager>();
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Display, Reflect, AutoRegisterType)]
-pub enum PrototypeMeshId {
-    Owned(String),
-    Static(&'static str),
-}
+pub type PrototypeMeshId = AnyString;
 
 impl From<String> for PrototypeMeshId {
     fn from(value: String) -> Self {
