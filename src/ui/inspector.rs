@@ -72,6 +72,10 @@ pub(crate) fn plugin(app: &mut App) {
         .add_systems(Update, update_picking);
 }
 
+#[derive(Component, Debug, Clone, Default, Reflect, AutoRegisterType)]
+#[reflect(Component)]
+pub struct Selected;
+
 #[derive(Debug, Eq, PartialEq)]
 enum InspectorSelection {
     Entities,
@@ -424,15 +428,18 @@ fn toggle_picking_enabled(
 fn update_picking(
     mut commands: Commands,
     mut ui_state: ResMut<UiState>,
+    prev_selected: Query<Entity, With<Selected>>,
     targets: Query<(Entity, Ref<PickSelection>, Option<&GizmoTarget>), Changed<PickSelection>>,
 ) {
     // Continuously update entities based on their picking state
 
-    let mut new_selection = vec![];
+    let mut has_updated = false;
+    let mut selected = prev_selected.iter().collect::<HashSet<_>>();
     for (entity, pick_selection, gizmo_target) in targets.iter() {
         if !pick_selection.is_changed() {
             continue;
         }
+        has_updated = true;
         let mut entity_cmd = commands.entity(entity);
 
         if pick_selection.is_selected {
@@ -442,24 +449,24 @@ fn update_picking(
             debug!("outline: {entity}");
             commands
                 .entity(entity)
-                .insert(crate::game::util::outline::Outline::default());
+                .insert(crate::game::util::outline::Outline::default())
+                .insert(Selected);
 
-            new_selection.push(entity);
+            selected.insert(entity);
         } else {
             entity_cmd.remove::<GizmoTarget>();
 
             commands
                 .entity(entity)
-                .remove::<crate::game::util::outline::Outline>();
+                .remove::<crate::game::util::outline::Outline>()
+                .remove::<Selected>();
+
+            selected.remove(&entity);
         }
     }
-    if !new_selection.is_empty() {
+    if has_updated {
         ui_state.selected_entities.clear();
-        for entity in new_selection.into_iter() {
-            // TODO: this only replaces with the last selected because we are querying on changed.
-            // we need to query all entities with pick selection to check for selection
-            // or
-            // to optimized we would need a marker component to track selected
+        for entity in selected.into_iter() {
             ui_state.selected_entities.select_maybe_add(entity, true);
         }
     }
