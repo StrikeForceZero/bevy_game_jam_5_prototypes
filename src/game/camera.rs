@@ -1,7 +1,10 @@
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
+use bevy_inspector_egui::bevy_inspector::hierarchy::SelectedEntities;
 
 use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
+
+use crate::ui::inspector::Focus;
 
 pub(crate) fn plugin(app: &mut App) {
     Types.register_types(app);
@@ -20,9 +23,11 @@ pub struct MainCamera;
 pub struct Types;
 
 fn pan_camera(
+    mut commands: Commands,
     time: Res<Time>,
     input: Res<ButtonInput<KeyCode>>,
     mut camera_q: Query<(Mut<Transform>, &OrthographicProjection), With<Camera>>,
+    focused_entities: Query<(Entity, &Focus)>,
 ) {
     let speed = if input.pressed(KeyCode::ShiftLeft) {
         500.0
@@ -30,24 +35,39 @@ fn pan_camera(
         50.0
     };
 
+    let mut unlock = false;
+
     if input.pressed(KeyCode::KeyW) {
+        unlock = true;
         for (mut transform, projection) in camera_q.iter_mut() {
             transform.translation.y += speed * time.delta_seconds() * projection.scale;
         }
     }
     if input.pressed(KeyCode::KeyS) {
+        unlock = true;
         for (mut transform, projection) in camera_q.iter_mut() {
             transform.translation.y -= speed * time.delta_seconds() * projection.scale;
         }
     }
     if input.pressed(KeyCode::KeyA) {
+        unlock = true;
         for (mut transform, projection) in camera_q.iter_mut() {
             transform.translation.x -= speed * time.delta_seconds() * projection.scale;
         }
     }
     if input.pressed(KeyCode::KeyD) {
+        unlock = true;
         for (mut transform, projection) in camera_q.iter_mut() {
             transform.translation.x += speed * time.delta_seconds() * projection.scale;
+        }
+    }
+
+    if unlock {
+        for (entity, focus) in focused_entities.iter() {
+            if let Focus::Follow = focus {
+                log::debug!("reverting focus {entity}");
+                commands.entity(entity).insert(Focus::Normal);
+            }
         }
     }
 }
@@ -78,6 +98,9 @@ fn zoom_camera(
                 amount
             };
             projection.scale -= amount * time.delta_seconds();
+            if projection.scale <= 0.0 {
+                projection.scale = 0.01;
+            }
         }
     }
 }

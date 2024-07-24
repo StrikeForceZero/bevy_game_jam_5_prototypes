@@ -27,7 +27,9 @@ use bevy_inspector_egui::bevy_egui::{EguiContext, EguiContexts, EguiSet};
 use bevy_inspector_egui::bevy_inspector::{
     ui_for_entities_shared_components, ui_for_entity_with_children,
 };
-use bevy_inspector_egui::bevy_inspector::hierarchy::{hierarchy_ui, SelectedEntities};
+use bevy_inspector_egui::bevy_inspector::hierarchy::{
+    hierarchy_ui, SelectedEntities, SelectionMode,
+};
 use bevy_mod_picking::picking_core::PickingPluginsSettings;
 use bevy_mod_picking::prelude::{HighlightPluginSettings, PickSelection};
 use bevy_mod_picking::selection::SelectionPluginSettings;
@@ -51,6 +53,7 @@ pub(crate) fn plugin(app: &mut App) {
     Types.register_types(app);
     app
         //
+        .add_event::<Select>()
         .configure_sets(Update, MainCameraController.run_if(is_game_view_focused))
         .insert_resource(UiState::new())
         .insert_resource(SelectionPluginSettings {
@@ -69,12 +72,26 @@ pub(crate) fn plugin(app: &mut App) {
         // TODO: not useful until 2d support is added
         // .add_systems(Update, set_gizmo_mode)
         .add_systems(PreUpdate, toggle_picking_enabled)
-        .add_systems(Update, update_picking);
+        .add_systems(
+            Update,
+            (selected_removed, update_selected, update_picking, on_select).chain(),
+        );
 }
+
+#[derive(Event, Debug, Clone, Reflect, AutoRegisterType)]
+pub struct Select(Entity);
 
 #[derive(Component, Debug, Clone, Default, Reflect, AutoRegisterType)]
 #[reflect(Component)]
 pub struct Selected;
+
+#[derive(Component, Debug, Clone, Default, Reflect, AutoRegisterType)]
+#[reflect(Component)]
+pub enum Focus {
+    #[default]
+    Normal,
+    Follow,
+}
 
 #[derive(Debug, Eq, PartialEq)]
 enum InspectorSelection {
@@ -90,6 +107,7 @@ struct UiState {
     selected_entities: SelectedEntities,
     selection: InspectorSelection,
     gizmo_mode: GizmoMode,
+    last_selection_action: Option<(SelectionMode, Entity)>,
 }
 
 impl UiState {
@@ -115,6 +133,7 @@ impl UiState {
             selection: InspectorSelection::Entities,
             viewport_rect: egui::Rect::NOTHING,
             gizmo_mode: GizmoMode::TranslateXY,
+            last_selection_action: None,
         }
     }
 
@@ -125,6 +144,7 @@ impl UiState {
             selected_entities: &mut self.selected_entities,
             selection: &mut self.selection,
             gizmo_mode: self.gizmo_mode,
+            last_selection_action: &mut self.last_selection_action,
         };
         DockArea::new(&mut self.state)
             .style(Style::from_egui(ctx.style().as_ref()))
@@ -154,6 +174,7 @@ struct TabViewer<'a> {
     selection: &'a mut InspectorSelection,
     viewport_rect: &'a mut egui::Rect,
     gizmo_mode: GizmoMode,
+    last_selection_action: &'a mut Option<(SelectionMode, Entity)>,
 }
 
 impl egui_dock::TabViewer for TabViewer<'_> {
@@ -234,54 +255,102 @@ impl egui_dock::TabViewer for TabViewer<'_> {
             }
             EguiWindow::Resources => select_resource(ui, &type_registry, self.selection),
             EguiWindow::Assets => select_asset(ui, &type_registry, self.world, self.selection),
-            EguiWindow::Inspector => match *self.selection {
-                InspectorSelection::Entities => {
-                    {
-                        // update camera position to selected entity / or averages between multiple selected entities
-                        let mut query = self.world.query::<&GlobalTransform>();
-                        let selected_transforms = self
-                            .selected_entities
-                            .iter()
-                            .filter_map(|entity| query.get(self.world, entity).ok())
-                            .collect::<Vec<_>>();
-                        let transform_count = selected_transforms.len();
-                        let average_translation = selected_transforms
-                            .into_iter()
-                            .fold(Vec3::ZERO, |sum, next| sum + next.translation())
-                            / transform_count as f32;
-                        let mut camera_transform = self
-                            .world
-                            .query_filtered::<Mut<Transform>, With<MainCamera>>()
-                            .get_single_mut(self.world)
-                            .expect("failed to get MainCamera");
-                        camera_transform.translation = average_translation;
+            EguiWindow::Inspector => {
+                match *self.selection {
+                    InspectorSelection::Entities => {
+                        {
+                            let last_action = self.selected_entities.last_action();
+                            let last_action_changed = {
+                                type SM = SelectionMode;
+                                // SelectionMode doesn't impl PartialEq
+                                match (*self.last_selection_action, last_action) {
+                                    (None, None) => false,
+                                    (Some((SM::Replace, a)), Some((SM::Replace, b))) => a != b,
+                                    (Some((SM::Extend, a)), Some((SM::Extend, b))) => a != b,
+                                    (Some((SM::Add, a)), Some((SM::Add, b))) => a != b,
+                                    _ => true,
+                                }
+                            };
+                            if last_action_changed {
+                                *self.last_selection_action = last_action;
+                                log::debug!("inspector entity selection changed {last_action:?}");
+                                if let Some((selection_mode, selection_action_entity)) = last_action
+                                {
+                                    let mut selected_entities_to_remove = self
+                                        .world
+                                        .query_filtered::<Entity, With<Selected>>()
+                                        .iter(self.world)
+                                        .collect::<HashSet<_>>();
+                                    for current_entity in self.selected_entities.iter() {
+                                        let Some((has_focus, has_selected)) = self
+                                            .world
+                                            .query::<(Has<Focus>, Has<Selected>)>()
+                                            .get(self.world, current_entity)
+                                            .ok()
+                                        else {
+                                            continue;
+                                        };
+                                        let mut commands = self.world.commands();
+                                        let mut entity_commands = commands.entity(current_entity);
+                                        if let SelectionMode::Replace = selection_mode {
+                                            // clear any not in current set
+                                            if current_entity != selection_action_entity {
+                                                entity_commands.remove::<Selected>();
+                                                continue;
+                                            }
+                                        };
+                                        selected_entities_to_remove.remove(&current_entity);
+                                        // add components if needed
+                                        if !has_selected {
+                                            entity_commands.insert(Selected);
+                                        }
+                                        if !has_focus {
+                                            log::debug!("adding follow {current_entity}");
+                                            entity_commands.insert(Focus::Follow);
+                                        }
+                                    }
+                                    for entity in selected_entities_to_remove {
+                                        self.world.commands().entity(entity).remove::<Selected>();
+                                    }
+                                } else {
+                                    // clear all
+                                    for entity in self
+                                        .world
+                                        .query_filtered::<Entity, Or<(With<Selected>, With<Focus>)>>()
+                                        .iter(self.world).collect::<Vec<_>>()
+                                    {
+                                        self.world.commands().entity(entity).remove::<Selected>().remove::<Focus>();
+                                    }
+                                }
+                            }
+                        }
+                        match self.selected_entities.as_slice() {
+                            &[entity] => ui_for_entity_with_children(self.world, entity, ui),
+                            entities => ui_for_entities_shared_components(self.world, entities, ui),
+                        }
                     }
-                    match self.selected_entities.as_slice() {
-                        &[entity] => ui_for_entity_with_children(self.world, entity, ui),
-                        entities => ui_for_entities_shared_components(self.world, entities, ui),
+                    InspectorSelection::Resource(type_id, ref name) => {
+                        ui.label(name);
+                        bevy_inspector::by_type_id::ui_for_resource(
+                            self.world,
+                            type_id,
+                            ui,
+                            name,
+                            &type_registry,
+                        )
+                    }
+                    InspectorSelection::Asset(type_id, ref name, handle) => {
+                        ui.label(name);
+                        bevy_inspector::by_type_id::ui_for_asset(
+                            self.world,
+                            type_id,
+                            handle,
+                            ui,
+                            &type_registry,
+                        );
                     }
                 }
-                InspectorSelection::Resource(type_id, ref name) => {
-                    ui.label(name);
-                    bevy_inspector::by_type_id::ui_for_resource(
-                        self.world,
-                        type_id,
-                        ui,
-                        name,
-                        &type_registry,
-                    )
-                }
-                InspectorSelection::Asset(type_id, ref name, handle) => {
-                    ui.label(name);
-                    bevy_inspector::by_type_id::ui_for_asset(
-                        self.world,
-                        type_id,
-                        handle,
-                        ui,
-                        &type_registry,
-                    );
-                }
-            },
+            }
             EguiWindow::Physics => {
                 let mut time_physics = self.world.resource_mut::<Time<Physics>>();
                 ui.heading("Physics");
@@ -370,7 +439,6 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                         self.world.commands().entity(entity).despawn_recursive();
                     }
                     self.world.commands().trigger(SpawnLevel);
-                    self.world.resource_mut::<Time<Physics>>().unpause();
                 }
             }
         }
@@ -447,49 +515,120 @@ fn toggle_picking_enabled(
         .all(|target| !target.is_focused() && !target.is_active());
 }
 
+fn on_select(
+    mut ui_state: ResMut<UiState>,
+    mut select_evr: EventReader<Select>,
+    selected: Query<Entity, With<Selected>>,
+) {
+    let selected_events = select_evr
+        .read()
+        .map(|&Select(entity)| entity)
+        .collect::<Vec<_>>();
+    if !selected_events.is_empty() {
+        debug!("Select event received for {selected_events:?}",);
+        debug!(
+            "setting select for {:?}",
+            selected.iter().collect::<Vec<_>>()
+        );
+        if let Some((SelectionMode::Replace, selected_entity)) = ui_state.last_selection_action {
+            if selected.contains(selected_entity) {
+                debug!("selection action already registered by inspector: {selected_entity}");
+                return;
+            }
+        }
+        ui_state.selected_entities.clear();
+        for entity in selected.iter() {
+            ui_state.selected_entities.select_maybe_add(entity, true);
+        }
+    }
+}
+
+fn update_selected(
+    mut commands: Commands,
+    mut main_camera_transform: Query<Mut<Transform>, With<MainCamera>>,
+    newly_selected: Query<(Entity, Ref<Selected>, Has<Focus>), Added<Selected>>,
+    all_selected: Query<(Entity, &GlobalTransform, &Focus), (With<Selected>, With<Focus>)>,
+    mut select_evw: EventWriter<Select>,
+) {
+    for (selected_entity, selected_ref, has_focus) in newly_selected.iter() {
+        if !selected_ref.is_added() {
+            continue;
+        }
+        debug!("update selected: {selected_entity}");
+        let mut entity_commands = commands.entity(selected_entity);
+        if !has_focus {
+            entity_commands.insert(Focus::Normal);
+        }
+        entity_commands.insert(PickSelection { is_selected: true });
+        // delay the inspector selection by a frame
+        select_evw.send(Select(selected_entity));
+    }
+
+    {
+        // make camera follow selection
+        let selected_transforms = all_selected
+            .iter()
+            .filter_map(|(_, t, focus)| match focus {
+                Focus::Normal => None,
+                Focus::Follow => Some(t),
+            })
+            .collect::<Vec<_>>();
+        let transform_count = selected_transforms.len();
+        if transform_count > 0 {
+            let average_translation = selected_transforms
+                .into_iter()
+                .fold(Vec3::ZERO, |sum, next| sum + next.translation())
+                / transform_count as f32;
+            for mut camera_transform in main_camera_transform.iter_mut() {
+                camera_transform.translation = average_translation;
+            }
+        }
+    }
+}
+
+fn selected_removed(
+    mut commands: Commands,
+    mut removed_selected: RemovedComponents<Selected>,
+    mut ui_state: ResMut<UiState>,
+) {
+    for removed in removed_selected.read() {
+        debug!("selected_removed: {removed}");
+        commands
+            .entity(removed)
+            .remove::<Focus>()
+            .try_insert(PickSelection { is_selected: false });
+        ui_state.selected_entities.remove(removed);
+    }
+}
+
 fn update_picking(
     mut commands: Commands,
-    mut ui_state: ResMut<UiState>,
-    prev_selected: Query<Entity, With<Selected>>,
     targets: Query<(Entity, Ref<PickSelection>, Option<&GizmoTarget>), Changed<PickSelection>>,
 ) {
     // Continuously update entities based on their picking state
-
-    let mut has_updated = false;
-    let mut selected = prev_selected.iter().collect::<HashSet<_>>();
     for (entity, pick_selection, gizmo_target) in targets.iter() {
         if !pick_selection.is_changed() {
             continue;
         }
-        has_updated = true;
+        debug!(
+            "Changed<PickSelection>: {entity} is_selected: {}",
+            pick_selection.is_selected
+        );
         let mut entity_cmd = commands.entity(entity);
 
         if pick_selection.is_selected {
             if gizmo_target.is_none() {
                 entity_cmd.insert(GizmoTarget::default());
             }
-            debug!("outline: {entity}");
-            commands
-                .entity(entity)
+
+            entity_cmd
                 .insert(crate::game::util::outline::Outline::default())
                 .insert(Selected);
-
-            selected.insert(entity);
         } else {
-            entity_cmd.remove::<GizmoTarget>();
-
-            commands
-                .entity(entity)
+            entity_cmd
+                .remove::<GizmoTarget>()
                 .remove::<crate::game::util::outline::Outline>()
                 .remove::<Selected>();
-
-            selected.remove(&entity);
-        }
-    }
-    if has_updated {
-        ui_state.selected_entities.clear();
-        for entity in selected.into_iter() {
-            ui_state.selected_entities.select_maybe_add(entity, true);
         }
     }
 }
