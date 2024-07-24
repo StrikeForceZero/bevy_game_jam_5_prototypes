@@ -358,22 +358,41 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                 #[derive(Debug, PartialEq)]
                 enum Speed {
                     Paused,
+                    SlowMo,
                     Single,
                     Double,
                     Triple,
                     Quad,
                 }
 
+                const SPEED_PAUSED: f32 = 0.0;
+                const SPEED_SLOW_MO: f32 = 0.1;
+                const SPEED_SINGLE: f32 = 1.0;
+                const SPEED_DOUBLE: f32 = 2.0;
+                const SPEED_TRIPLE: f32 = 3.0;
+                const SPEED_QUAD: f32 = 4.0;
+
                 impl Speed {
+                    const fn speed(&self) -> f32 {
+                        match self {
+                            Self::Paused => SPEED_PAUSED,
+                            Self::SlowMo => SPEED_SLOW_MO,
+                            Self::Single => SPEED_SINGLE,
+                            Self::Double => SPEED_DOUBLE,
+                            Self::Triple => SPEED_TRIPLE,
+                            Self::Quad => SPEED_QUAD,
+                        }
+                    }
                     fn get(time_physics: &Mut<Time<Physics>>) -> Self {
                         let is_paused = time_physics.is_paused();
                         let speed = time_physics.relative_speed();
                         match (is_paused, speed) {
                             (true, _) => Self::Paused,
-                            (false, 1.0) => Self::Single,
-                            (false, 2.0) => Self::Double,
-                            (false, 3.0) => Self::Triple,
-                            (false, 4.0) => Self::Quad,
+                            (false, SPEED_SLOW_MO) => Self::SlowMo,
+                            (false, SPEED_SINGLE) => Self::Single,
+                            (false, SPEED_DOUBLE) => Self::Double,
+                            (false, SPEED_TRIPLE) => Self::Triple,
+                            (false, SPEED_QUAD) => Self::Quad,
                             _ => panic!("unknown speed {speed}"),
                         }
                     }
@@ -386,30 +405,36 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                                     time_physics.pause();
                                 }
                             }
-                            Speed::Single => {
-                                if is_paused || speed != 1.0 {
+                            Speed::SlowMo => {
+                                if is_paused || speed != SPEED_SLOW_MO {
                                     time_physics.unpause();
-                                    time_physics.set_relative_speed(1.0);
+                                    time_physics.set_relative_speed(SPEED_SLOW_MO);
+                                }
+                            }
+                            Speed::Single => {
+                                if is_paused || speed != SPEED_SINGLE {
+                                    time_physics.unpause();
+                                    time_physics.set_relative_speed(SPEED_SINGLE);
                                 }
                             }
                             Speed::Double => {
-                                if is_paused || speed != 2.0 {
+                                if is_paused || speed != SPEED_DOUBLE {
                                     time_physics.unpause();
-                                    time_physics.set_relative_speed(2.0);
+                                    time_physics.set_relative_speed(SPEED_DOUBLE);
                                     // TODO: should probably increase resolution
                                 }
                             }
                             Speed::Triple => {
-                                if is_paused || speed != 3.0 {
+                                if is_paused || speed != SPEED_TRIPLE {
                                     time_physics.unpause();
-                                    time_physics.set_relative_speed(3.0);
+                                    time_physics.set_relative_speed(SPEED_TRIPLE);
                                     // TODO: should probably increase resolution
                                 }
                             }
                             Speed::Quad => {
-                                if is_paused || speed != 4.0 {
+                                if is_paused || speed != SPEED_QUAD {
                                     time_physics.unpause();
-                                    time_physics.set_relative_speed(4.0);
+                                    time_physics.set_relative_speed(SPEED_QUAD);
                                     // TODO: should probably increase resolution
                                 }
                             }
@@ -420,6 +445,7 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                 let mut speed = Speed::get(&time_physics);
 
                 ui.radio_value(&mut speed, Speed::Paused, "|| Pause");
+                ui.radio_value(&mut speed, Speed::SlowMo, "... SlowMo");
                 ui.radio_value(&mut speed, Speed::Single, "> Play");
                 ui.radio_value(&mut speed, Speed::Double, ">> Double");
                 ui.radio_value(&mut speed, Speed::Triple, ">>> Triple");
