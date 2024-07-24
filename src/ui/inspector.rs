@@ -235,10 +235,32 @@ impl egui_dock::TabViewer for TabViewer<'_> {
             EguiWindow::Resources => select_resource(ui, &type_registry, self.selection),
             EguiWindow::Assets => select_asset(ui, &type_registry, self.world, self.selection),
             EguiWindow::Inspector => match *self.selection {
-                InspectorSelection::Entities => match self.selected_entities.as_slice() {
-                    &[entity] => ui_for_entity_with_children(self.world, entity, ui),
-                    entities => ui_for_entities_shared_components(self.world, entities, ui),
-                },
+                InspectorSelection::Entities => {
+                    {
+                        // update camera position to selected entity / or averages between multiple selected entities
+                        let mut query = self.world.query::<&GlobalTransform>();
+                        let selected_transforms = self
+                            .selected_entities
+                            .iter()
+                            .filter_map(|entity| query.get(self.world, entity).ok())
+                            .collect::<Vec<_>>();
+                        let transform_count = selected_transforms.len();
+                        let average_translation = selected_transforms
+                            .into_iter()
+                            .fold(Vec3::ZERO, |sum, next| sum + next.translation())
+                            / transform_count as f32;
+                        let mut camera_transform = self
+                            .world
+                            .query_filtered::<Mut<Transform>, With<MainCamera>>()
+                            .get_single_mut(self.world)
+                            .expect("failed to get MainCamera");
+                        camera_transform.translation = average_translation;
+                    }
+                    match self.selected_entities.as_slice() {
+                        &[entity] => ui_for_entity_with_children(self.world, entity, ui),
+                        entities => ui_for_entities_shared_components(self.world, entities, ui),
+                    }
+                }
                 InspectorSelection::Resource(type_id, ref name) => {
                     ui.label(name);
                     bevy_inspector::by_type_id::ui_for_resource(
