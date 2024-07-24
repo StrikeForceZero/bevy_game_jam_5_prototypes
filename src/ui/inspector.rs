@@ -45,7 +45,6 @@ use transform_gizmo_bevy::mint::RowMatrix4;
 use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
 
 use crate::game::camera::{MainCamera, MainCameraController};
-use crate::game::orbital::celestial::CelestialBody;
 use crate::game::spawn::level::SpawnLevel;
 use crate::screen::Screen;
 
@@ -455,15 +454,6 @@ impl egui_dock::TabViewer for TabViewer<'_> {
             }
             EguiWindow::GameState => {
                 if ui.button("Reload World").clicked() {
-                    self.world.resource_mut::<Time<Physics>>().pause();
-                    let bodies = self
-                        .world
-                        .query_filtered::<Entity, With<CelestialBody>>()
-                        .iter(self.world)
-                        .collect::<Vec<_>>();
-                    for entity in bodies {
-                        self.world.commands().entity(entity).despawn_recursive();
-                    }
                     self.world.commands().trigger(SpawnLevel);
                 }
             }
