@@ -22,7 +22,7 @@ pub struct Types;
 fn pan_camera(
     time: Res<Time>,
     input: Res<ButtonInput<KeyCode>>,
-    mut camera_q: Query<Mut<Transform>, With<Camera>>,
+    mut camera_q: Query<(Mut<Transform>, &OrthographicProjection), With<Camera>>,
 ) {
     let speed = if input.pressed(KeyCode::ShiftLeft) {
         500.0
@@ -31,23 +31,23 @@ fn pan_camera(
     };
 
     if input.pressed(KeyCode::KeyW) {
-        for mut transform in camera_q.iter_mut() {
-            transform.translation.y += speed * time.delta_seconds();
+        for (mut transform, projection) in camera_q.iter_mut() {
+            transform.translation.y += speed * time.delta_seconds() * projection.scale;
         }
     }
     if input.pressed(KeyCode::KeyS) {
-        for mut transform in camera_q.iter_mut() {
-            transform.translation.y -= speed * time.delta_seconds();
+        for (mut transform, projection) in camera_q.iter_mut() {
+            transform.translation.y -= speed * time.delta_seconds() * projection.scale;
         }
     }
     if input.pressed(KeyCode::KeyA) {
-        for mut transform in camera_q.iter_mut() {
-            transform.translation.x -= speed * time.delta_seconds();
+        for (mut transform, projection) in camera_q.iter_mut() {
+            transform.translation.x -= speed * time.delta_seconds() * projection.scale;
         }
     }
     if input.pressed(KeyCode::KeyD) {
-        for mut transform in camera_q.iter_mut() {
-            transform.translation.x += speed * time.delta_seconds();
+        for (mut transform, projection) in camera_q.iter_mut() {
+            transform.translation.x += speed * time.delta_seconds() * projection.scale;
         }
     }
 }
