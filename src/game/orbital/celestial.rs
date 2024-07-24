@@ -61,7 +61,7 @@ pub struct OrbitalPhysicsSchedule;
 #[reflect(Resource, InspectorOptions)]
 pub struct ForceScale(
     #[inspector(min = 0.0)]
-    #[default(1.0)]
+    #[default(100000.0 * 7.5)]
     pub f32,
 );
 
