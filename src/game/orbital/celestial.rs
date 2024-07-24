@@ -1,10 +1,10 @@
-use std::fmt::Formatter;
+use std::fmt::{Debug, Formatter};
 
 use avian2d::dynamics::integrator::IntegrationSet;
 use avian2d::math::Vector;
 use avian2d::prelude::{
-    Collider, LinearVelocity, Mass, Physics, PhysicsSchedule, PhysicsSet, PhysicsStepSet,
-    RigidBody, SolverSet,
+    Collider, ExternalForce, LinearVelocity, Mass, Physics, PhysicsSchedule, PhysicsSet,
+    PhysicsStepSet, RigidBody, SolverSet,
 };
 use bevy::asset::Assets;
 use bevy::color::palettes::basic::YELLOW;
@@ -24,7 +24,8 @@ use bevy_inspector_egui::prelude::{InspectorOptions, ReflectInspectorOptions};
 use bevy_mod_picking::PickableBundle;
 use derive_more::Display;
 use itertools::Itertools;
-use log::debug;
+use log::{debug, warn};
+use ordered_float::NotNan;
 use smart_default::SmartDefault;
 
 use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
@@ -60,7 +61,7 @@ pub struct OrbitalPhysicsSchedule;
 #[reflect(Resource, InspectorOptions)]
 pub struct ForceScale(
     #[inspector(min = 0.0)]
-    #[default(100000.0 * 7.5)]
+    #[default(1.0)]
     pub f32,
 );
 
@@ -126,6 +127,15 @@ pub struct CelestialBodyBundle {
     celestial_mesh: CelestialMesh,
     celestial_body_color: CelestialBodyColor,
     pickable_bundle: PickableBundle,
+    external_force: ExternalForce,
+}
+
+impl Debug for CelestialBodyBundle {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CelestialBodyBundle")
+            .field("mass", &self.mass.0)
+            .finish()
+    }
 }
 
 impl Clone for CelestialBodyBundle {
@@ -144,6 +154,7 @@ impl Clone for CelestialBodyBundle {
                 selection: self.pickable_bundle.selection.clone(),
                 highlight: self.pickable_bundle.highlight.clone(),
             },
+            external_force: ExternalForce::default(),
         }
     }
 }
@@ -159,6 +170,7 @@ impl CelestialBodyBundle {
             celestial_mesh: CelestialMesh::Standard(ordered_float::OrderedFloat(radius)),
             celestial_body_color: CelestialBodyColor(color.into()),
             pickable_bundle: PickableBundle::default(),
+            external_force: ExternalForce::default(),
         }
     }
     pub fn with_transform(mut self, transform: Transform) -> Self {
@@ -221,7 +233,8 @@ struct PhysicsUpdateQueryData<'w> {
     entity: Entity,
     transform: &'w Transform,
     mass: &'w Mass,
-    linear_velocity: Mut<'w, LinearVelocity>,
+    linear_velocity: &'w LinearVelocity,
+    external_force: Mut<'w, ExternalForce>,
     collider: &'w Collider,
 }
 
@@ -262,7 +275,14 @@ fn compute_forces(bodies: &mut Vec<BodyPhysicsData>) {
                 if distance > 0.0 {
                     let force_magnitude = G * body_i.mass * body_j.mass / (distance * distance);
                     let force_direction = r_ij.normalize();
-                    let force = force_direction * force_magnitude;
+                    let mut force = force_direction * force_magnitude;
+                    if !force.is_finite() {
+                        warn!(
+                            "force between {} and {} is not finite: {force}",
+                            body_i.entity, body_j.entity
+                        );
+                        force = Vec2::ZERO;
+                    }
                     *force_to_apply_map.entry(body_i.entity).or_default() += force;
                     *force_body_map
                         .entry(body_i.entity)
@@ -317,8 +337,9 @@ fn physics_update(
             ));
         }
 
-        // debug!("{} {force:?}", item.entity);
-        item.linear_velocity.0 += Vector::from(force);
+        item.external_force.x = force.x;
+        item.external_force.y = force.y;
+
         let mut entry = debug_gizmos.point_map.entry(item.entity).or_default();
 
         if let Some(&last) = entry.last() {
@@ -352,8 +373,10 @@ fn draw_lines(ratio_floor: Res<RatioFloor>, mut debug_gizmos: Gizmos<DebugCelest
             (
                 a,
                 b,
-                ordered_float::NotNan::new(force.length_squared())
-                    .unwrap_or_else(|err| panic!("{err}")),
+                ordered_float::NotNan::new(force.length_squared()).unwrap_or_else(|err| {
+                    warn!("force is NaN: {force}, err: {err}");
+                    NotNan::new(0.0).unwrap_or_else(|_| unreachable!())
+                }),
             )
         })
         .minmax_by(|(.., a), (.., b)| a.cmp(b))
