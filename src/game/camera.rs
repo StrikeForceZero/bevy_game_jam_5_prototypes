@@ -90,7 +90,11 @@ fn zoom_camera(
             MouseScrollUnit::Pixel => event.y,
         } * speed;
         for mut projection in camera_q.iter_mut() {
-            let amount = if projection.scale <= 1.0 {
+            let amount = if projection.scale <= 0.05 {
+                amount * 0.001
+            } else if projection.scale <= 0.25 {
+                amount * 0.05
+            } else if projection.scale <= 1.0 {
                 amount * 0.25
             } else if projection.scale >= 3.0 {
                 amount * 2.0
@@ -99,7 +103,7 @@ fn zoom_camera(
             };
             projection.scale -= amount * time.delta_seconds();
             if projection.scale <= 0.0 {
-                projection.scale = 0.01;
+                projection.scale = 0.001;
             }
         }
     }
