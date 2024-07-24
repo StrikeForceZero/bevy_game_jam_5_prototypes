@@ -454,7 +454,9 @@ impl egui_dock::TabViewer for TabViewer<'_> {
             }
             EguiWindow::GameState => {
                 if ui.button("Reload World").clicked() {
-                    self.world.commands().trigger(SpawnLevel);
+                    self.world
+                        .resource_mut::<NextState<Screen>>()
+                        .set(Screen::BeforePlaying);
                 }
             }
         }
