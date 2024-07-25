@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 pub mod debug_draw;
+pub mod force;
 pub mod outline;
 
 pub(crate) fn plugin(app: &mut App) {
