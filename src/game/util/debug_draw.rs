@@ -62,20 +62,26 @@ pub struct DebugDrawGizmos {
 }
 
 impl DebugDrawGizmos {
-    pub fn has_scope(&self, scope: &AnyUniqueString) -> bool {
-        self.scopes.contains_key(scope)
+    pub fn has_scope<'a>(&self, scope: impl Into<&'a AnyUniqueString>) -> bool {
+        self.scopes.contains_key(scope.into())
     }
-    pub fn remove_scope(&mut self, scope: &AnyUniqueString) -> Option<DebugDrawScope> {
-        self.scopes.remove(scope)
+    pub fn remove_scope<'a>(
+        &mut self,
+        scope: impl Into<&'a AnyUniqueString>,
+    ) -> Option<DebugDrawScope> {
+        self.scopes.remove(scope.into())
     }
-    pub fn get_scope(&self, scope: &AnyUniqueString) -> Option<&DebugDrawScope> {
-        self.scopes.get(scope)
+    pub fn get_scope<'a>(&self, scope: impl Into<&'a AnyUniqueString>) -> Option<&DebugDrawScope> {
+        self.scopes.get(scope.into())
     }
-    pub fn get_scope_mut(&mut self, scope: &AnyUniqueString) -> Option<&mut DebugDrawScope> {
-        self.scopes.get_mut(scope)
+    pub fn get_scope_mut<'a>(
+        &mut self,
+        scope: impl Into<&'a AnyUniqueString>,
+    ) -> Option<&mut DebugDrawScope> {
+        self.scopes.get_mut(scope.into())
     }
-    pub fn scope(&mut self, scope: AnyUniqueString) -> &mut DebugDrawScope {
-        self.scopes.entry(scope).or_default()
+    pub fn scope(&mut self, scope: impl Into<AnyUniqueString>) -> &mut DebugDrawScope {
+        self.scopes.entry(scope.into()).or_default()
     }
 }
 
