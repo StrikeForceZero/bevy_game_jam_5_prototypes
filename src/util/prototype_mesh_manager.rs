@@ -17,24 +17,6 @@ pub(super) fn plugin(app: &mut App) {
 
 pub type PrototypeMeshId = AnyString;
 
-impl From<String> for PrototypeMeshId {
-    fn from(value: String) -> Self {
-        Self::Owned(value)
-    }
-}
-
-impl From<&String> for PrototypeMeshId {
-    fn from(value: &String) -> Self {
-        Self::Owned(value.to_owned())
-    }
-}
-
-impl From<&'static str> for PrototypeMeshId {
-    fn from(value: &'static str) -> Self {
-        Self::Static(value)
-    }
-}
-
 pub trait PrototypeMesh {
     fn get_id(&self) -> PrototypeMeshId;
     fn get_mesh(&self) -> Mesh;

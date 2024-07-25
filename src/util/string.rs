@@ -16,12 +16,48 @@ pub enum AnyString {
     Static(&'static str),
 }
 
+impl From<String> for AnyString {
+    fn from(value: String) -> Self {
+        Self::Owned(value)
+    }
+}
+
+impl From<&String> for AnyString {
+    fn from(value: &String) -> Self {
+        Self::Owned(value.to_owned())
+    }
+}
+
+impl From<&'static str> for AnyString {
+    fn from(value: &'static str) -> Self {
+        Self::Static(value)
+    }
+}
+
 #[derive(Debug, Clone, Display, Reflect, AutoRegisterType)]
 pub enum AnyUniqueString {
     #[display(fmt = "{}", _0)]
     Owned(String),
     #[display(fmt = "{}", _0)]
     Static(&'static str),
+}
+
+impl From<String> for AnyUniqueString {
+    fn from(value: String) -> Self {
+        Self::Owned(value)
+    }
+}
+
+impl From<&String> for AnyUniqueString {
+    fn from(value: &String) -> Self {
+        Self::Owned(value.to_owned())
+    }
+}
+
+impl From<&'static str> for AnyUniqueString {
+    fn from(value: &'static str) -> Self {
+        Self::Static(value)
+    }
 }
 
 impl Hash for AnyUniqueString {
