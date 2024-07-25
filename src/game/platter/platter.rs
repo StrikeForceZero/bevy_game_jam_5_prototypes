@@ -7,7 +7,7 @@ use smart_default::SmartDefault;
 
 use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
 
-use crate::game::util::mesh::create_hollow_circle_vertices;
+use crate::game::util::mesh::generate_donut_vertices;
 use crate::util::prototype_mesh_manager::{PrototypeMesh, PrototypeMeshId};
 use crate::util::PrototypeManagerSystemParam;
 
@@ -55,7 +55,7 @@ impl PlatterBundle {
         let color_mesh_2d_bundle =
             prototype_manager_system_param.get_or_create_color_mesh_2d(&platter_radius, GRAY);
         let collider = Collider::polyline(
-            create_hollow_circle_vertices(radius, radius * 3.0, 64),
+            generate_donut_vertices(radius, radius * 3.0, 64),
             None,
         );
         Self {

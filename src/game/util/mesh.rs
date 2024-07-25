@@ -2,7 +2,7 @@ use std::f32::consts::PI;
 
 use bevy::math::Vec2;
 
-pub fn create_hollow_circle_vertices(
+pub fn generate_donut_vertices(
     inner_radius: f32,
     outer_radius: f32,
     circle_resolution: usize,
