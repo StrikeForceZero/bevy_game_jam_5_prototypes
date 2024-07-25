@@ -585,8 +585,10 @@ fn selected_removed(
 ) {
     for removed in removed_selected.read() {
         debug!("selected_removed: {removed}");
-        commands
-            .entity(removed)
+        let Some(mut entity_commands) = commands.get_entity(removed) else {
+            continue;
+        };
+        entity_commands
             .remove::<Focus>()
             .try_insert(PickSelection { is_selected: false });
         ui_state.selected_entities.remove(removed);

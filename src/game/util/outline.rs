@@ -11,8 +11,7 @@ use crate::util::color_material_manager::ColorMaterialManager;
 
 pub(crate) fn plugin(app: &mut App) {
     Types.register_types(app);
-    app.add_systems(Update, outline_changed);
-    app.add_systems(Update, outline_removed);
+    app.add_systems(Update, (outline_changed, outline_removed).chain());
 }
 
 #[derive(Component, Debug, SmartDefault, Reflect, AutoRegisterType)]
@@ -70,22 +69,30 @@ fn process(
     }
     let child = if let Some(child) = child {
         debug!("reusing old marker {child}");
-        child
+        Some(child)
     } else {
+        let Some(mut entity_commands) = process_params.commands.get_entity(query_item.entity)
+        else {
+            return;
+        };
         debug!("creating new marker");
-        let child = process_params
-            .commands
-            .spawn((
-                Name::new("OutlineMeshMarker"),
-                OutlineMeshMarker,
-                SpatialBundle::default(),
-            ))
-            .id();
-        process_params
-            .commands
-            .entity(query_item.entity)
-            .add_child(child);
+        let mut child = None;
+        entity_commands.with_children(|parent| {
+            child = Some(
+                parent
+                    .spawn((
+                        Name::new("OutlineMeshMarker"),
+                        OutlineMeshMarker,
+                        SpatialBundle::default(),
+                    ))
+                    .id(),
+            );
+        });
         child
+    };
+    let Some(child) = child else {
+        // probably clicking the OutlineMeshMarker in the inspector
+        return;
     };
     let transform =
         Transform::from_xyz(0.0, 0.0, query_item.transform.translation.z - 1.0).with_scale(
@@ -94,7 +101,7 @@ fn process(
     let color_material_handle = process_params
         .color_material_manager
         .get_or_create(&mut process_params.materials, query_item.outline.color);
-    process_params.commands.entity(child).insert((
+    process_params.commands.entity(child).try_insert((
         query_item.mesh_handle.clone(),
         color_material_handle,
         transform,
@@ -134,7 +141,10 @@ fn outline_removed(
                 continue;
             }
             debug!("removing outline marker for {child}");
-            commands.entity(child).despawn_recursive();
+            let Some(entity_commands) = commands.get_entity(child) else {
+                continue;
+            };
+            entity_commands.despawn_recursive();
         }
     }
 }
