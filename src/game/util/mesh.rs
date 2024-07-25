@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use bevy::math::Vec2;
 
 pub fn create_hollow_circle_vertices(
@@ -11,7 +13,7 @@ pub fn create_hollow_circle_vertices(
         if index > circle_resolution {
             panic!("invalid index got: {index}, expected: 0..={circle_resolution}");
         }
-        let theta = 2.0 * std::f32::consts::PI * index as f32 / circle_resolution as f32;
+        let theta = 2.0 * PI * index as f32 / circle_resolution as f32;
         let x = radius * theta.cos();
         let y = radius * theta.sin();
         Vec2::new(x, y)
