@@ -1,6 +1,8 @@
 use bevy::asset::{Assets, Handle};
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::{App, Color, ColorMaterial, Mesh, ResMut};
+use bevy::sprite::ColorMesh2dBundle;
+use bevy::utils::default;
 
 use crate::game::util::debug_draw;
 use crate::util::color_material_manager::ColorMaterialManager;
@@ -45,5 +47,17 @@ impl PrototypeManagerSystemParam<'_> {
     ) -> Handle<ColorMaterial> {
         self.color_material_manager
             .get_or_create(&mut self.materials, color)
+    }
+
+    pub fn get_or_create_color_mesh_2d<'a, T: PrototypeMesh + 'a>(
+        &mut self,
+        mesh: impl Into<&'a T>,
+        color: impl Into<Color> + Copy,
+    ) -> ColorMesh2dBundle {
+        ColorMesh2dBundle {
+            mesh: self.get_or_create_mesh(mesh).into(),
+            material: self.get_or_create_material(color),
+            ..default()
+        }
     }
 }
