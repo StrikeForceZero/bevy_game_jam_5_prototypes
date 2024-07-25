@@ -1,21 +1,20 @@
 //! Spawn the main level by triggering other observers.
 
-use avian2d::prelude::{AngularVelocity, CollisionMargin, Physics};
-use bevy::color::palettes::css::RED;
+use avian2d::prelude::{AngularVelocity, Physics};
+use bevy::color::palettes::css::{BLUE, RED};
 use bevy::prelude::*;
 
-use crate::game::platter::platter::{Platter, PlatterBundle};
-use crate::game::platter::platter_object::{PlatterObject, PlatterObjectBundle};
+use crate::game::platter::mesh::PlatterMeshOptionsObj;
+use crate::game::platter::platter::{create_platter, CreatePlatterOptions, Platter};
 use crate::game::util::debug_draw::DebugDrawGizmosSystemParam;
+use crate::game::util::mesh::{calculate_centroid, generate_subdivided_donut_split_vertices};
 use crate::screen::Screen;
 use crate::util::prototype_mesh_manager::{PrototypeMesh, PrototypeMeshId};
 use crate::util::PrototypeManagerSystemParam;
-use crate::util::ref_ext::RefExt;
 
 pub(super) fn plugin(app: &mut App) {
     app.observe(spawn_level);
     app.add_systems(Update, input);
-    app.add_systems(Update, platter_object_added);
 }
 
 #[derive(Event, Debug)]
@@ -45,20 +44,46 @@ fn spawn_level(
     // but add things like walls etc. here.
     // commands.trigger(SpawnPlayer);
 
-    commands
-        .spawn((
-            StateScoped(Screen::Playing),
-            PlatterBundle::new(&mut prototype_manager_system_param, 100.0),
-            CollisionMargin(0.5),
-        ))
-        .with_children(|parent| {
-            parent.spawn((
-                StateScoped(Screen::Playing),
-                CollisionMargin(0.5),
-                PlatterObjectBundle::new(&mut prototype_manager_system_param, RED, 10.0)
-                    .with_transform(Transform::from_xyz(5.0, 5.0, 5.0)),
-            ));
-        });
+    create_platter(
+        commands.spawn(StateScoped(Screen::Playing)),
+        &mut prototype_manager_system_param,
+        CreatePlatterOptions {
+            platter_mesh_options: PlatterMeshOptionsObj {
+                inner_radius: 20.0,
+                outer_radius: 125.0,
+                pie_cuts: 10,
+                onion_layers: 20,
+                ..default()
+            },
+            ..default()
+        },
+    );
+
+    // debug_draw_segments(&mut debug_draw_gizmos);
+}
+
+// visually generate_subdivided_donut_split_vertices
+fn debug_draw_segments(debug_draw_gizmos: &mut DebugDrawGizmosSystemParam) {
+    for (ax, slices) in generate_subdivided_donut_split_vertices(20.0, 125.0, 32, 64, 10, 20, true)
+        .into_iter()
+        .enumerate()
+    {
+        for (bx, segment) in slices.into_iter().enumerate() {
+            let color = if (ax % 2) ^ (bx % 2) != 0 { RED } else { BLUE };
+            let center = calculate_centroid(&segment);
+            for point in segment {
+                let direction_to_origin = (point - center) * 0.05;
+                // shrink
+                let point = point - direction_to_origin;
+                debug_draw_gizmos
+                    .get()
+                    .scope(format!(
+                        "debug generate_subdivided_donut_split_vertices {ax} {bx}"
+                    ))
+                    .add_color_point(point, color);
+            }
+        }
+    }
 }
 
 fn input(
@@ -79,24 +104,5 @@ fn input(
         };
         angular_velocity.0 += velocity_delta * physics_time.delta_seconds();
         angular_velocity.0 = angular_velocity.0.clamp(-100.0, 100.0);
-    }
-}
-
-fn platter_object_added(
-    mut platter_objects_q: Query<
-        (Entity, Ref<PlatterObject>, &Parent, &mut Transform),
-        (Added<PlatterObject>, Without<Platter>),
-    >,
-    platter_q: Query<&Transform, With<Platter>>,
-) {
-    for (entity, platter_obj_ref, parent, mut transform) in platter_objects_q.iter_mut() {
-        if !platter_obj_ref.is_added_or_changed() {
-            continue;
-        }
-        let Some(platter) = platter_q.get(parent.get()).ok() else {
-            continue;
-        };
-        transform.translation.z = platter.translation.z + 2.0;
-        log::debug!("updating z for {entity} {}", transform.translation.z);
     }
 }

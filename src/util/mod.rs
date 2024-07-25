@@ -1,11 +1,11 @@
 use bevy::asset::{Assets, Handle};
 use bevy::ecs::system::SystemParam;
-use bevy::prelude::{App, Color, ColorMaterial, Mesh, ResMut};
+use bevy::prelude::{App, ColorMaterial, Mesh, ResMut};
 use bevy::sprite::ColorMesh2dBundle;
 use bevy::utils::default;
 
 use crate::game::util::debug_draw;
-use crate::util::color_material_manager::ColorMaterialManager;
+use crate::util::color_material_manager::{AssociatedColorMaterial, ColorMaterialManager};
 use crate::util::prototype_mesh_manager::{PrototypeMesh, PrototypeMeshManager};
 
 pub(crate) mod color_ext;
@@ -27,10 +27,10 @@ pub(super) fn plugin(app: &mut App) {
 
 #[derive(SystemParam)]
 pub struct PrototypeManagerSystemParam<'w> {
-    materials: ResMut<'w, Assets<ColorMaterial>>,
-    meshes: ResMut<'w, Assets<Mesh>>,
-    color_material_manager: ResMut<'w, ColorMaterialManager>,
-    prototype_mesh_manager: ResMut<'w, PrototypeMeshManager>,
+    pub materials: ResMut<'w, Assets<ColorMaterial>>,
+    pub meshes: ResMut<'w, Assets<Mesh>>,
+    pub color_material_manager: ResMut<'w, ColorMaterialManager>,
+    pub prototype_mesh_manager: ResMut<'w, PrototypeMeshManager>,
 }
 
 impl PrototypeManagerSystemParam<'_> {
@@ -41,18 +41,18 @@ impl PrototypeManagerSystemParam<'_> {
         self.prototype_mesh_manager
             .get_or_create(&mut self.meshes, mesh)
     }
-    pub fn get_or_create_material(
+    pub fn get_or_create_material<T: AssociatedColorMaterial>(
         &mut self,
-        color: impl Into<Color> + Copy,
+        color: T,
     ) -> Handle<ColorMaterial> {
         self.color_material_manager
             .get_or_create(&mut self.materials, color)
     }
 
-    pub fn get_or_create_color_mesh_2d<'a, T: PrototypeMesh + 'a>(
+    pub fn get_or_create_color_mesh_2d<'a, M: PrototypeMesh + 'a, C: AssociatedColorMaterial>(
         &mut self,
-        mesh: impl Into<&'a T>,
-        color: impl Into<Color> + Copy,
+        mesh: impl Into<&'a M>,
+        color: C,
     ) -> ColorMesh2dBundle {
         ColorMesh2dBundle {
             mesh: self.get_or_create_mesh(mesh).into(),
