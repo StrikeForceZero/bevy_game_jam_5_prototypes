@@ -1,7 +1,7 @@
 //! Spawn the main level by triggering other observers.
 
 use avian2d::prelude::{AngularVelocity, Physics};
-use bevy::color::palettes::css::{BLUE, RED};
+use bevy::color::palettes::css::{BLUE, DARK_GRAY, RED};
 use bevy::prelude::*;
 
 use crate::game::platter::mesh::PlatterMeshOptionsObj;
@@ -58,6 +58,31 @@ fn spawn_level(
             ..default()
         },
     );
+
+    commands.spawn((
+        Name::new("PlatterArm"),
+        ColorMesh2dBundle {
+            mesh: prototype_manager_system_param
+                .meshes
+                .add(Rectangle::new(5.0, 130.0))
+                .into(),
+            material: prototype_manager_system_param.get_or_create_material(Color::from(DARK_GRAY)),
+            transform: Transform::from_xyz(0.0, 130.0 / 2.0, 2.0),
+            ..default()
+        },
+    ));
+
+    commands.spawn((
+        Name::new("Center"),
+        ColorMesh2dBundle {
+            mesh: prototype_manager_system_param
+                .meshes
+                .add(Circle::new(15.0))
+                .into(),
+            material: prototype_manager_system_param.get_or_create_material(Color::from(DARK_GRAY)),
+            ..default()
+        },
+    ));
 
     // debug_draw_segments(&mut debug_draw_gizmos);
 }
