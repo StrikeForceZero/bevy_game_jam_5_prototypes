@@ -4,8 +4,8 @@ use bevy::prelude::*;
 use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
 
 use crate::game::platter::mesh::PlatterSegmentMesh;
+use crate::game::platter::segment::PlatterSegmentColor;
 use crate::util::color_material_manager::{AssociatedColorMaterial, ColorMaterialManagerId};
-use crate::util::PrototypeManagerSystemParam;
 use crate::util::ref_ext::RefExt;
 
 pub(crate) fn plugin(app: &mut App) {
@@ -38,28 +38,30 @@ impl AssociatedColorMaterial for InnerValue {
 
 #[derive(Component, Debug, Default, Copy, Clone, Reflect, AutoRegisterType)]
 #[reflect(Component)]
-pub struct PlatterValue(pub Option<InnerValue>);
+pub struct PlatterSegmentValue(pub Option<InnerValue>);
 
 #[derive(RegisterTypeBinder)]
 pub struct Types;
 
 fn platter_value_updated(
-    mut commands: Commands,
-    mut prototype_manager_system_param: PrototypeManagerSystemParam,
-    changed: Query<
-        (Entity, Ref<PlatterValue>, &PlatterSegmentMesh),
-        (Changed<PlatterValue>, With<Handle<ColorMaterial>>),
+    mut changed: Query<
+        (
+            Entity,
+            Ref<PlatterSegmentValue>,
+            &PlatterSegmentMesh,
+            Mut<PlatterSegmentColor>,
+        ),
+        (Changed<PlatterSegmentValue>, With<PlatterSegmentColor>),
     >,
 ) {
-    for (entity, value, psm) in changed.iter() {
+    for (entity, value, psm, mut psc) in changed.iter_mut() {
         if !value.is_added_or_changed() {
             continue;
         }
-        let color_material_handle = match value.0 {
-            None => prototype_manager_system_param
-                .get_or_create_material(psm.options.initial_segment_color),
-            Some(inner) => prototype_manager_system_param.get_or_create_material(inner),
+        let new_color = match value.0 {
+            None => psm.options.initial_segment_color,
+            Some(inner) => inner.color(),
         };
-        commands.entity(entity).insert(color_material_handle);
+        psc.0 = new_color;
     }
 }

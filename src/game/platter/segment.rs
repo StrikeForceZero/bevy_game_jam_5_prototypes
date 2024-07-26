@@ -9,6 +9,7 @@ use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
 
 use crate::game::platter::mesh::PlatterSegmentMesh;
 use crate::game::platter::platter::Platter;
+use crate::game::platter::value::PlatterSegmentValue;
 use crate::game::util::mesh::calculate_centroid;
 use crate::util::PrototypeManagerSystemParam;
 use crate::util::ref_ext::RefExt;
@@ -26,7 +27,7 @@ pub struct PlatterSegment;
 
 #[derive(Component, Debug, Default, Copy, Clone, Reflect, AutoRegisterType)]
 #[reflect(Component)]
-pub struct PlatterSegmentColor(Color);
+pub struct PlatterSegmentColor(pub(super) Color);
 
 impl PlatterSegmentColor {
     pub fn get(&self) -> Color {
@@ -54,6 +55,7 @@ pub struct PlatterSegmentBundle {
     color_mesh_2d_bundle: ColorMesh2dBundle,
     center_point: CenterPoint,
     collider: Collider,
+    platter_segment_value: PlatterSegmentValue,
 }
 
 impl PlatterSegmentBundle {

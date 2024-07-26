@@ -5,7 +5,7 @@ use internal_proc_macros::RegisterTypeBinder;
 pub mod mesh;
 pub mod platter;
 pub mod segment;
-mod value;
+pub mod value;
 
 pub(crate) fn plugin(app: &mut App) {
     Types.register_types(app);

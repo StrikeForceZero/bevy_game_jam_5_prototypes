@@ -1,11 +1,13 @@
 //! Spawn the main level by triggering other observers.
 
-use avian2d::prelude::{AngularVelocity, Physics};
+use avian2d::prelude::{AngularVelocity, Collider, CollidingEntities, Physics};
 use bevy::color::palettes::css::{BLUE, DARK_GRAY, RED};
 use bevy::prelude::*;
 
 use crate::game::platter::mesh::PlatterMeshOptionsObj;
 use crate::game::platter::platter::{create_platter, CreatePlatterOptions, Platter};
+use crate::game::platter::segment::PlatterSegment;
+use crate::game::platter::value::{InnerValue, PlatterSegmentValue};
 use crate::game::util::debug_draw::DebugDrawGizmosSystemParam;
 use crate::game::util::mesh::{calculate_centroid, generate_subdivided_donut_split_vertices};
 use crate::screen::Screen;
@@ -15,6 +17,7 @@ use crate::util::PrototypeManagerSystemParam;
 pub(super) fn plugin(app: &mut App) {
     app.observe(spawn_level);
     app.add_systems(Update, input);
+    app.add_systems(Update, highlight_segments_under_arm);
 }
 
 #[derive(Event, Debug)]
@@ -32,6 +35,9 @@ impl PrototypeMesh for Foo {
         Circle::new(self.0).into()
     }
 }
+
+#[derive(Component)]
+struct PlatterArm;
 
 fn spawn_level(
     _trigger: Trigger<SpawnLevel>,
@@ -60,6 +66,7 @@ fn spawn_level(
     );
 
     commands.spawn((
+        PlatterArm,
         Name::new("PlatterArm"),
         ColorMesh2dBundle {
             mesh: prototype_manager_system_param
@@ -70,6 +77,7 @@ fn spawn_level(
             transform: Transform::from_xyz(0.0, 130.0 / 2.0, 2.0),
             ..default()
         },
+        Collider::rectangle(5.0, 130.0),
     ));
 
     commands.spawn((
@@ -129,5 +137,19 @@ fn input(
         };
         angular_velocity.0 += velocity_delta * physics_time.delta_seconds();
         angular_velocity.0 = angular_velocity.0.clamp(-100.0, 100.0);
+    }
+}
+
+fn highlight_segments_under_arm(
+    arm_q: Query<(Entity, &CollidingEntities), With<PlatterArm>>,
+    mut segments_q: Query<&mut PlatterSegmentValue, With<PlatterSegment>>,
+) {
+    for (entity, colliding_entities) in arm_q.iter() {
+        for &colliding_entity in colliding_entities.0.iter() {
+            let Some(mut psv) = segments_q.get_mut(colliding_entity).ok() else {
+                continue;
+            };
+            psv.0.replace(InnerValue::Red);
+        }
     }
 }
