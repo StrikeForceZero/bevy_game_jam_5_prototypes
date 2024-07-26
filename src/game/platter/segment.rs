@@ -1,3 +1,4 @@
+use avian2d::prelude::Collider;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -52,6 +53,7 @@ pub struct PlatterSegmentBundle {
     platter_segment_mesh: PlatterSegmentMesh,
     color_mesh_2d_bundle: ColorMesh2dBundle,
     center_point: CenterPoint,
+    collider: Collider,
 }
 
 impl PlatterSegmentBundle {
@@ -65,6 +67,7 @@ impl PlatterSegmentBundle {
         if platter_segment_mesh.vertices.is_empty() {
             panic!("empty vertices");
         }
+        let collider = Collider::polyline(platter_segment_mesh.vertices.clone(), None);
         let color_mesh_2d_bundle =
             prototype_context.get_or_create_color_mesh_2d(&platter_segment_mesh, color);
         Self {
@@ -72,6 +75,7 @@ impl PlatterSegmentBundle {
             platter_segment_color: PlatterSegmentColor(color),
             platter_segment_mesh,
             color_mesh_2d_bundle,
+            collider,
             ..default()
         }
     }
