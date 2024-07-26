@@ -267,9 +267,9 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                                 log::debug!("inspector entity selection changed {last_action:?}");
                                 let target_camera = self
                                     .world
-                                    .query_filtered::<Entity, With<MainCamera>>()
+                                    .query_filtered::<Entity, With<Camera>>()
                                     .get_single(self.world)
-                                    .expect("Failed to get MainCamera");
+                                    .expect("Failed to get camera");
                                 if let Some((selection_mode, selection_action_entity)) = last_action
                                 {
                                     let mut selected_entities_to_remove = self
@@ -488,7 +488,10 @@ fn set_camera_viewport(
     egui_settings: Res<bevy_egui::EguiSettings>,
     mut cameras: Query<&mut Camera, With<MainCamera>>,
 ) {
-    let mut cam = cameras.single_mut();
+    let Some(mut cam) = cameras.get_single_mut().ok() else {
+        warn!("no main cameras found");
+        return;
+    };
 
     let Ok(window) = primary_window.get_single() else {
         return;
