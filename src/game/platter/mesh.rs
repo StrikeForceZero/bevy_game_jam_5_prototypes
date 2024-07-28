@@ -100,6 +100,7 @@ impl From<PlatterMeshOptionsObj> for PlatterMeshes {
                     options.outer_radius,
                     options.inner_resolution,
                     options.outer_resolution,
+                    false,
                 ),
             },
             segments,

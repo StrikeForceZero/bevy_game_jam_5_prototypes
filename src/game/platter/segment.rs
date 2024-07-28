@@ -3,6 +3,7 @@ use bevy::ecs::query::QueryData;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::transform::systems::propagate_transforms;
+use bevy_mod_picking::PickableBundle;
 use smart_default::SmartDefault;
 
 use internal_proc_macros::{AutoRegisterType, RegisterTypeBinder};
@@ -45,7 +46,7 @@ impl CenterPoint {
     }
 }
 
-#[derive(Bundle, SmartDefault, Clone)]
+#[derive(Bundle, SmartDefault)]
 pub struct PlatterSegmentBundle {
     #[default(Name::new("PlatterSegment"))]
     name: Name,
@@ -56,6 +57,7 @@ pub struct PlatterSegmentBundle {
     center_point: CenterPoint,
     collider: Collider,
     platter_segment_value: PlatterSegmentValue,
+    pickable_bundle: PickableBundle,
 }
 
 impl PlatterSegmentBundle {
