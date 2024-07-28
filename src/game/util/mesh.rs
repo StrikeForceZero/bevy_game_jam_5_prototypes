@@ -124,36 +124,76 @@ pub fn line_strip_into_triangle_list_indices(vertices: &[Vec3]) -> Vec<u32> {
     indices
 }
 
-pub fn generate_donut_vertices(
+pub fn generate_donut_vertices_clamped(
     inner_radius: f32,
     outer_radius: f32,
     inner_resolution: usize,
     outer_resolution: usize,
+    start_angle: f32,
+    stop_angle: f32,
+    close: bool,
 ) -> Vec<Vec2> {
     let mut vertices = Vec::new();
 
-    let calc_point = |radius: f32, index: usize, resolution: usize| -> Vec2 {
-        if index > resolution {
-            panic!("invalid index got: {index}, expected: 0..={resolution}");
-        }
-        let theta = 2.0 * PI * index as f32 / resolution as f32;
-        let x = radius * theta.cos();
-        let y = radius * theta.sin();
-        Vec2::new(x, y)
-    };
+    let calc_point =
+        |radius: f32, index: usize, resolution: usize, start_angle: f32, stop_angle: f32| -> Vec2 {
+            if index > resolution {
+                panic!("invalid index got: {index}, expected: 0..={resolution}");
+            }
+            let angle_range = stop_angle - start_angle;
+            let theta = start_angle + angle_range * index as f32 / resolution as f32;
+            let x = radius * theta.cos();
+            let y = radius * theta.sin();
+            Vec2::new(x, y)
+        };
 
     // Generate inside circle vertices
     for i in 0..=inner_resolution {
-        vertices.push(calc_point(inner_radius, i, inner_resolution));
+        vertices.push(calc_point(
+            inner_radius,
+            i,
+            inner_resolution,
+            start_angle,
+            stop_angle,
+        ));
     }
 
     // Generate outside circle vertices
     // Going in reverse will ensure the inner start and stop match the outers
     for i in (0..=outer_resolution).rev() {
-        vertices.push(calc_point(outer_radius, i, outer_resolution));
+        vertices.push(calc_point(
+            outer_radius,
+            i,
+            outer_resolution,
+            start_angle,
+            stop_angle,
+        ));
     }
 
+    let Some(&first) = vertices.first() else {
+        panic!("generate_donut_vertices_clamped generated empty")
+    };
+    vertices.push(first);
+
     vertices
+}
+
+pub fn generate_donut_vertices(
+    inner_radius: f32,
+    outer_radius: f32,
+    inner_resolution: usize,
+    outer_resolution: usize,
+    close: bool,
+) -> Vec<Vec2> {
+    generate_donut_vertices_clamped(
+        inner_radius,
+        outer_radius,
+        inner_resolution,
+        outer_resolution,
+        0.0,
+        2.0 * PI,
+        close,
+    )
 }
 
 pub fn generate_subdivided_donut_split_vertices(
