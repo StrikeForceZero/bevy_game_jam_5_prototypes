@@ -4,6 +4,7 @@ use bevy::math::Vec3;
 use bevy::prelude::{Mesh, Vec2};
 use bevy::render::mesh::{Indices, PrimitiveTopology};
 use bevy::render::render_asset::RenderAssetUsages;
+use ordered_float::OrderedFloat;
 
 fn ear_clip_triangulate(vertices: &[Vec2]) -> Vec<[usize; 3]> {
     let mut indices: Vec<[usize; 3]> = Vec::new();
@@ -210,6 +211,55 @@ pub fn generate_subdivided_donut_split_vertices(
     }
 
     vertices
+}
+
+pub fn rotate_point(p: Vec2, angle: f32) -> Vec2 {
+    let cos_angle = angle.cos();
+    let sin_angle = angle.sin();
+    Vec2 {
+        x: p.x * cos_angle - p.y * sin_angle,
+        y: p.x * sin_angle + p.y * cos_angle,
+    }
+}
+
+// Function to find the convex hull using Andrew's monotone chain algorithm
+pub fn convex_hull(mut points: impl IntoIterator<Item = Vec2>) -> Vec<Vec2> {
+    let mut points = points.into_iter().collect::<Vec<_>>();
+    // Sort points lexicographically (by x, then by y)
+    points.sort_by(|a, b| {
+        (OrderedFloat::from(a.x), OrderedFloat::from(a.y))
+            .cmp(&(OrderedFloat::from(b.x), OrderedFloat::from(b.y)))
+    });
+
+    fn is_cross_under_zero(items: &[Vec2], p: Vec2) -> bool {
+        (items[items.len() - 2] - p).perp_dot(items[items.len() - 1] - p) <= 0.0
+    }
+
+    // Build the lower hull
+    let mut lower: Vec<Vec2> = Vec::new();
+    for &p in &points {
+        while lower.len() >= 2 && is_cross_under_zero(&lower, p) {
+            lower.pop();
+        }
+        lower.push(p);
+    }
+
+    // Build the upper hull
+    let mut upper: Vec<Vec2> = Vec::new();
+    for &p in points.iter().rev() {
+        while upper.len() >= 2 && is_cross_under_zero(&upper, p) {
+            upper.pop();
+        }
+        upper.push(p);
+    }
+
+    // Remove the last point of each half because it is repeated at the beginning of the other half
+    lower.pop();
+    upper.pop();
+
+    // Combine lower and upper hulls
+    lower.extend(upper);
+    lower
 }
 
 #[cfg(test)]
